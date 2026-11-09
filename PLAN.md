@@ -120,6 +120,8 @@ la-torre/
 - [x] Bot cliente por WebSocket (`loadtest/jugar_bot.py` + `estrategia.py`, reutilizable por Locust)
 - [x] Dockerfile (imagen de 189 MB); `docker build` + `docker run` + `/metrics` funcionando
 - [x] Auditoría (9 nov): 8 fallos corregidos con 21 pruebas de regresión (72 en total), imagen 1.1
+- [x] Cliente 2D de pruebas en el navegador (`cliente/prueba2d/`): jugar, cooperativo y espectador
+- [x] Colisión caballero–jefe (encontrada al probar el cliente); imagen 1.3, 73 pruebas
 - [ ] Tomar **capturas 3.3 (1 y 2)** siguiendo `docs/capturas.md`
 - [ ] Locust local: `Jugador` hace una run completa con acciones aleatorias contra el contenedor
 - [ ] Commit por cada pieza

@@ -165,6 +165,21 @@ def test_el_snapshot_vacia_los_eventos():
     assert p.snapshot()["eventos"] == []
 
 
+def test_el_caballero_no_puede_meterse_dentro_del_jefe():
+    p = Partida(semilla=1)
+    p.agregar_jugador("ana")
+    p.recibir("ana", {"accion": "listo"})
+    p.paso(DT)
+    c, jefe = p.jugadores["ana"], p.jefe
+    p.recibir("ana", {"accion": "mover", "dx": jefe.x - c.x, "dy": jefe.y - c.y})
+    minimo = jefe.definicion.radio + C.RADIO_CABALLERO
+    for _ in range(100):                         # 5 s caminando contra el jefe
+        p.paso(DT)
+        if p.terminada:
+            break
+        assert distancia(c.x, c.y, jefe.x, jefe.y) >= minimo - 1e-6
+
+
 def test_modo_invalido():
     with pytest.raises(ValueError):
         Partida(modo="arena")

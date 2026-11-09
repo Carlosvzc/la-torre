@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La Torre · cliente de pruebas</title>
+<!--
+  Cliente 2D de pruebas de La Torre (vista desde arriba).
+  No decide nada: solo manda acciones y dibuja el snapshot que manda el servidor.
+  Ábrelo con doble clic y conéctate a ws://localhost:7654.
+-->
+<style>
+  :root {
+    --fondo: #0d0c10; --panel: #17151c; --borde: #2c2833; --texto: #e6e1d6; --tenue: #8d8694;
+    --vida: #c0392b; --stamina: #4f9d4a; --jefe: #d98e2b; --aviso: #ff3b30; --acento: #e3c27a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--texto);
+         font: 14px/1.4 system-ui, "Segoe UI", sans-serif; }
+  header { padding: 10px 16px; border-bottom: 1px solid var(--borde); display: flex;
+           gap: 12px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0 8px 0 0; color: var(--acento); letter-spacing: .5px; }
+  input, select, button { background: var(--panel); color: var(--texto); border: 1px solid var(--borde);
+                          border-radius: 4px; padding: 5px 8px; font: inherit; }
+  button { cursor: pointer; } button:hover { border-color: var(--acento); }
+  #estadoConexion { color: var(--tenue); font-size: 13px; }
+  main { display: flex; gap: 16px; padding: 16px; flex-wrap: wrap; justify-content: center; }
+  #zona { position: relative; width: min(640px, 100%); aspect-ratio: 1; }
+  canvas { width: 100%; height: 100%; display: block; border: 1px solid var(--borde); border-radius: 4px; }
+  #capa { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+          background: rgba(8, 7, 10, .72); flex-direction: column; gap: 14px; text-align: center; padding: 20px; }
+  #capa h2 { margin: 0; color: var(--acento); font-size: 22px; }
+  .cartas { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .carta { width: 150px; padding: 12px; background: var(--panel); border: 1px solid var(--borde);
+           border-radius: 6px; cursor: pointer; }
+  .carta:hover { border-color: var(--acento); }
+  .carta b { display: block; color: var(--acento); margin-bottom: 4px; }
+  .carta small { color: var(--tenue); }
+  aside { width: 300px; display: flex; flex-direction: column; gap: 12px; }
+  .bloque { background: var(--panel); border: 1px solid var(--borde); border-radius: 6px; padding: 10px 12px; }
+  .bloque h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--tenue); }
+  .barra { height: 10px; background: #26222b; border-radius: 3px; overflow: hidden; margin: 3px 0 8px; }
+  .barra div { height: 100%; transition: width .1s linear; }
+  #eventos { margin: 0; padding-left: 16px; max-height: 180px; overflow: auto; font-size: 13px; }
+  kbd { background: #26222b; border: 1px solid var(--borde); border-radius: 3px; padding: 0 4px; font-size: 12px; }
+  .tenue { color: var(--tenue); }
+</style>
+</head>
+<body>
+<header>
+  <h1>LA TORRE · cliente de pruebas</h1>
+  <input id="url" value="ws://localhost:7654" size="22" aria-label="Servidor">
+  <input id="nombre" placeholder="tu nombre" size="12" aria-label="Nombre">
+  <select id="rol" aria-label="Rol">
+    <option value="jugador">Jugador</option>
+    <option value="espectador">Espectador</option>
+  </select>
+  <button id="botonConectar">Conectar</button>
+  <span id="estadoConexion">desconectado</span>
+</header>
+
+<main>
+  <div id="zona">
+    <canvas id="lienzo" width="800" height="800"></canvas>
+    <div id="capa"></div>
+  </div>
+  <aside>
+    <div class="bloque">
+      <h3 id="tituloPiso">Piso –</h3>
+      <div id="nombreJefe">—</div>
+      <div class="barra"><div id="barraJefe" style="width:0;background:var(--jefe)"></div></div>
+      <div class="tenue" id="infoJefe"></div>
+    </div>
+    <div class="bloque" id="bloqueYo">
+      <h3>Tu caballero</h3>
+      Vida <span id="txtVida" class="tenue"></span>
+      <div class="barra"><div id="barraVida" style="width:0;background:var(--vida)"></div></div>
+      Resistencia <span id="txtStamina" class="tenue"></span>
+      <div class="barra"><div id="barraStamina" style="width:0;background:var(--stamina)"></div></div>
+      <div class="tenue" id="infoYo"></div>
+    </div>
+    <div class="bloque">
+      <h3>Partida</h3>
+      <div id="infoPartida" class="tenue">Sin conexión</div>
+    </div>
+    <div class="bloque">
+      <h3>Eventos</h3>
+      <ul id="eventos"></ul>
+    </div>
+    <div class="bloque tenue">
+      <h3>Controles</h3>
+      <kbd>W A S D</kbd> mover · <kbd>J</kbd> o clic atacar (al jefe)<br>
+      <kbd>Espacio</kbd> esquivar · <kbd>Enter</kbd> listo · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> mejora
+    </div>
+  </aside>
+</main>
+
+<script>
+"use strict";
+const ARENA = 20;                     // la arena mide 20 x 20 unidades (igual que el servidor)
+const TICK_MS = 50;                   // 20 snapshots por segundo
+const COS_CONO = Math.cos(75 * Math.PI / 180);
+const COLORES = ["#e8e2d0", "#6fb3e0", "#b58ee0", "#7fd18b"];
+const COLOR_JEFE = { guardian: "#9aa3ad", bruja: "#d9763b", sabueso: "#7a4fd1", rey: "#d9b83b", coloso: "#c9443a" };
+
+const $ = (id) => document.getElementById(id);
+// Todo texto que venga de otros clientes (nombres) se escapa antes de meterlo en HTML
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const lienzo = $("lienzo"), ctx = lienzo.getContext("2d");
+const S = lienzo.width / ARENA;       // píxeles por unidad
+
+let ws = null, miId = null, miRol = "jugador";
+let previo = null, actual = null, tActual = 0;   // dos snapshots para interpolar
+let avisoVisto = null;                            // { clave, total } del aviso del jefe en curso
+let elegida = false, fin = null, rtt = null;
+const teclas = new Set();
+let movEnviado = "0,0";
+const coloresJugador = {};
+
+// --- Conexión ---------------------------------------------------------------------
+function conectar() {
+  if (ws) { const viejo = ws; viejo.onclose = viejo.onmessage = null; viejo.close(); }
+  document.activeElement && document.activeElement.blur();   // que Enter no vuelva a pulsar "Conectar"
+  miRol = $("rol").value;
+  miId = $("nombre").value.trim() || "caballero" + Math.floor(Math.random() * 1000);
+  $("nombre").value = miId;
+  previo = actual = null; fin = null; elegida = false;
+  $("eventos").innerHTML = "";
+  ponerEstado("conectando…");
+  try { ws = new WebSocket($("url").value.trim()); }
+  catch (e) { ponerEstado("URL inválida"); return; }
+  const este = ws;
+  ws.onopen = () => este.send(JSON.stringify({ hola: { id: miId, rol: miRol } }));
+  ws.onmessage = (m) => {
+    const d = JSON.parse(m.data);
+    if ("pong" in d) { rtt = performance.now() - d.pong; return; }
+    if (d.bienvenida) { ponerEstado(`conectado como ${miRol === "jugador" ? miId : "espectador"} · modo ${d.bienvenida.modo}`); return; }
+    if ("estado" in d) recibir(d);
+  };
+  ws.onclose = (e) => {
+    if (ws !== este) return;                 // es una conexión vieja: no tocar la actual
+    ws = null;
+    ponerEstado(`desconectado (${e.code}${e.reason ? ": " + e.reason : ""})`);
+    if (!fin) mostrarCapa(`<h2>Sin conexión</h2><p class="tenue">${esc(e.reason || "El servidor cerró la conexión.")}</p>
+      <button onclick="conectar()">Reconectar</button>`);
+  };
+}
+function enviar(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+function ponerEstado(t) { $("estadoConexion").textContent = t; }
+setInterval(() => enviar({ ping: performance.now() }), 1000);    // latencia ida y vuelta
+
+// --- Snapshots ------------------------------------------------------------------------
+function recibir(snap) {
+  previo = actual; actual = snap; tActual = performance.now();
+  Object.keys(snap.jugadores).sort().forEach((id, i) => { coloresJugador[id] ??= COLORES[i % COLORES.length]; });
+  for (const e of snap.eventos) registrarEvento(e, snap);
+  if (snap.estado !== "mejora") elegida = false;
+  const aviso = snap.jefe && snap.jefe.aviso;
+  if (aviso) {
+    const clave = aviso.ataque + JSON.stringify(aviso.zonas);
+    if (!avisoVisto || avisoVisto.clave !== clave) avisoVisto = { clave, total: Math.max(aviso.en, 0.05) };
+  } else avisoVisto = null;
+  actualizarPanel(snap);
+  actualizarCapa(snap);
+}
+
+function registrarEvento(e, snap) {
+  let texto = null;
+  if (e.tipo === "entra") texto = `${e.jugador} entra a la sala`;
+  else if (e.tipo === "sale") texto = `${e.jugador} se fue`;
+  else if (e.tipo === "piso") texto = `Piso ${e.piso}: ${e.jefe}`;
+  else if (e.tipo === "jefe_vencido") texto = `¡Jefe del piso ${e.piso} vencido!`;
+  else if (e.tipo === "impacto") texto = e.dano > 0 ? `${e.ataque} alcanza a ${e.jugador} (−${e.dano})`
+                                                     : `${e.jugador} esquiva ${e.ataque}`;
+  else if (e.tipo === "fin") { fin = e; texto = `FIN: ${e.resultado} (${e.motivo})`; }
+  if (!texto) return;                                  // los golpes del caballero no se listan (son muchos)
+  const li = document.createElement("li");
+  li.textContent = `[${snap.t.toFixed(1)} s] ${texto}`;
+  $("eventos").prepend(li);
+  while ($("eventos").children.length > 40) $("eventos").lastChild.remove();
+}
+
+function barra(id, valor, maximo) { $(id).style.width = `${Math.max(0, 100 * valor / maximo)}%`; }
+
+function actualizarPanel(s) {
+  $("tituloPiso").textContent = `Piso ${s.piso} de ${s.pisos}`;
+  if (s.jefe) {
+    $("nombreJefe").textContent = s.jefe.nombre;
+    barra("barraJefe", s.jefe.vida, s.jefe.vida_max);
+    const estados = { persiguiendo: "persigue", preparando: "¡prepara un ataque!",
+                      recuperando: "se recupera: ¡castígalo!", muerto: "vencido" };
+    $("infoJefe").textContent = `Fase ${s.jefe.fase}/${s.jefe.fases} · ${Math.ceil(s.jefe.vida)}/${Math.ceil(s.jefe.vida_max)} · ${estados[s.jefe.estado] || s.jefe.estado}`;
+  }
+  const yo = s.jugadores[miId];
+  $("bloqueYo").style.display = miRol === "jugador" ? "" : "none";
+  if (yo) {
+    barra("barraVida", yo.vida, yo.vida_max); barra("barraStamina", yo.st, yo.st_max);
+    $("txtVida").textContent = `${Math.ceil(yo.vida)}/${yo.vida_max}`;
+    $("txtStamina").textContent = `${Math.floor(yo.st)}/${yo.st_max}`;
+    $("infoYo").textContent = `Estado: ${yo.estado}`;
+  }
+  const otros = Object.keys(s.jugadores).map((id) => `${esc(id)}${id === miId ? " (tú)" : ""}`).join(", ");
+  $("infoPartida").innerHTML = `Estado: <b>${esc(s.estado)}</b> · combate ${s.t.toFixed(1)} s<br>` +
+    `Jugadores: ${otros || "—"}<br>Latencia: ${rtt === null ? "—" : rtt.toFixed(0) + " ms"}`;
+}
+
+// --- Capas: sala de espera, mejoras y fin -------------------------------------------------
+function mostrarCapa(html) { $("capa").innerHTML = html; $("capa").style.display = "flex"; }
+function ocultarCapa() { $("capa").style.display = "none"; }
+
+function actualizarCapa(s) {
+  if (fin) {
+    const gano = fin.resultado === "victoria";
+    return mostrarCapa(`<h2>${gano ? "¡La torre fue conquistada!" : "Has caído"}</h2>
+      <p>${esc(fin.motivo)}<br><span class="tenue">Tiempo de combate: ${s.t.toFixed(1)} s · piso ${s.piso} de ${s.pisos}</span></p>
+      <button onclick="conectar()">Jugar otra run</button>`);
+  }
+  if (s.estado === "esperando") {
+    const listo = miRol === "jugador" ? "Pulsa <kbd>Enter</kbd> cuando estés listo." : "Esperando a los jugadores…";
+    return mostrarCapa(`<h2>Sala de espera</h2><p>${listo}<br>
+      <span class="tenue">La run empieza sola en ${s.inicio_en.toFixed(0)} s.</span></p>`);
+  }
+  if (s.estado === "mejora" && miRol === "jugador") {
+    const ofertas = (s.ofertas || {})[miId] || [];
+    if (elegida) return mostrarCapa(`<h2>Mejora elegida</h2><p class="tenue">Esperando a los demás… (${s.elegir_en.toFixed(0)} s)</p>`);
+    const cartas = ofertas.map((o, i) => `<div class="carta" onclick="elegir(${i})">
+        <b>${i + 1}. ${esc(o.nombre)}</b><small>${esc(o.descripcion)}</small></div>`).join("");
+    return mostrarCapa(`<h2>Elige una mejora</h2><div class="cartas">${cartas}</div>
+      <p class="tenue">Si no eliges en ${s.elegir_en.toFixed(0)} s se toma la primera.</p>`);
+  }
+  if (s.estado === "mejora") return mostrarCapa(`<h2>Los jugadores eligen mejora…</h2>`);
+  ocultarCapa();
+}
+
+// --- Controles -------------------------------------------------------------------------
+function yoYJefe() {
+  if (!actual || !actual.jefe) return [null, null];
+  return [actual.jugadores[miId], actual.jefe];
+}
+function direccionTeclas() {
+  const dx = (teclas.has("d") || teclas.has("arrowright") ? 1 : 0) - (teclas.has("a") || teclas.has("arrowleft") ? 1 : 0);
+  const dy = (teclas.has("w") || teclas.has("arrowup") ? 1 : 0) - (teclas.has("s") || teclas.has("arrowdown") ? 1 : 0);
+  return [dx, dy];
+}
+function actualizarMovimiento() {
+  const [dx, dy] = direccionTeclas();
+  const clave = `${dx},${dy}`;
+  if (clave !== movEnviado) { movEnviado = clave; enviar({ accion: "mover", dx, dy }); }
+}
+function atacar() {
+  const [yo, jefe] = yoYJefe();
+  if (yo) enviar({ accion: "atacar", dx: jefe.x - yo.x, dy: jefe.y - yo.y });   // fija al jefe como objetivo
+}
+function esquivar() {
+  const [dx, dy] = direccionTeclas();
+  enviar({ accion: "esquivar", dx, dy });            // sin dirección, el servidor esquiva hacia atrás
+}
+function elegir(i) {
+  const ofertas = actual && (actual.ofertas || {})[miId];
+  if (!ofertas || !ofertas[i] || elegida) return;
+  enviar({ accion: "elegir_mejora", id: ofertas[i].id });
+  elegida = true;
+  actualizarCapa(actual);
+}
+
+addEventListener("keydown", (e) => {
+  if (["INPUT", "SELECT"].includes(e.target.tagName) || miRol !== "jugador") return;
+  const k = e.key.toLowerCase();
+  if (k === "enter" || k === " ") e.preventDefault();   // el teclado es del juego, no de los botones
+  if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) {
+    teclas.add(k); actualizarMovimiento(); e.preventDefault();
+  } else if (k === "j" && !e.repeat) atacar();
+  else if ((k === " " || k === "k") && !e.repeat) { esquivar(); e.preventDefault(); }
+  else if (k === "enter") enviar({ accion: "listo" });
+  else if (["1", "2", "3"].includes(k)) elegir(Number(k) - 1);
+});
+addEventListener("keyup", (e) => { teclas.delete(e.key.toLowerCase()); actualizarMovimiento(); });
+addEventListener("blur", () => { teclas.clear(); actualizarMovimiento(); });
+lienzo.addEventListener("mousedown", () => { if (miRol === "jugador") atacar(); });
+$("botonConectar").addEventListener("click", conectar);
+
+// --- Dibujo -----------------------------------------------------------------------------
+const pantalla = (x, y) => [x * S, (ARENA - y) * S];     // el jefe aparece arriba
+function interpolar(a, b, campo, alfa) { return a ? a[campo] + (b[campo] - a[campo]) * alfa : b[campo]; }
+
+function circulo(x, y, r, relleno, borde, grosor = 2) {
+  const [px, py] = pantalla(x, y);
+  ctx.beginPath(); ctx.arc(px, py, r * S, 0, Math.PI * 2);
+  if (relleno) { ctx.fillStyle = relleno; ctx.fill(); }
+  if (borde) { ctx.strokeStyle = borde; ctx.lineWidth = grosor; ctx.stroke(); }
+}
+function texto(t, x, y, color = "#e6e1d6", tam = 15) {
+  const [px, py] = pantalla(x, y);
+  ctx.fillStyle = color; ctx.font = `600 ${tam}px system-ui, sans-serif`; ctx.textAlign = "center";
+  ctx.fillText(t, px, py);
+}
+
+function dibujarSuelo() {
+  ctx.fillStyle = "#141218"; ctx.fillRect(0, 0, lienzo.width, lienzo.height);
+  ctx.strokeStyle = "#1f1c24"; ctx.lineWidth = 1;
+  for (let i = 2; i < ARENA; i += 2) {
+    ctx.beginPath(); ctx.moveTo(i * S, 0); ctx.lineTo(i * S, lienzo.height); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i * S); ctx.lineTo(lienzo.width, i * S); ctx.stroke();
+  }
+  // luz tenue en el centro, como una antorcha en la arena oscura
+  const g = ctx.createRadialGradient(lienzo.width / 2, lienzo.height / 2, 40, lienzo.width / 2, lienzo.height / 2, lienzo.width * 0.7);
+  g.addColorStop(0, "rgba(227,194,122,0.06)"); g.addColorStop(1, "rgba(0,0,0,0.45)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, lienzo.width, lienzo.height);
+}
+
+function dibujarAviso(jefe) {
+  const a = jefe.aviso;
+  if (!a || !avisoVisto) return;
+  const progreso = 1 - Math.max(0, a.en) / avisoVisto.total;     // 0 → recién avisado, 1 → impacto
+  for (const [zx, zy] of a.zonas) {
+    circulo(zx, zy, a.radio, `rgba(255,59,48,${0.10 + 0.25 * progreso})`, "rgba(255,59,48,0.9)", 2);
+    circulo(zx, zy, a.radio * progreso, "rgba(255,59,48,0.30)", null);
+  }
+  texto(a.ataque, a.zonas[0][0], a.zonas[0][1] + a.radio + 0.35, "#ff8a80", 13);
+}
+
+function dibujarJefe(jb, ja, alfa) {
+  const x = interpolar(ja, jb, "x", alfa), y = interpolar(ja, jb, "y", alfa);
+  if (jb.estado === "muerto") { circulo(x, y, jb.radio, "#2a262f", "#4a4450"); return; }
+  const anillo = jb.estado === "preparando" ? "#ff3b30" : jb.estado === "recuperando" ? "#7fd1c7" : "#000";
+  circulo(x, y, jb.radio, COLOR_JEFE[jb.id] || "#d98e2b", anillo, jb.estado === "persiguiendo" ? 2 : 4);
+  texto(jb.nombre, x, y + jb.radio + 0.45, "#e3c27a", 14);
+}
+
+function dibujarCaballero(id, cb, ca, alfa) {
+  const x = interpolar(ca, cb, "x", alfa), y = interpolar(ca, cb, "y", alfa);
+  const color = coloresJugador[id] || "#e8e2d0";
+  if (cb.estado === "muerto") {
+    const [px, py] = pantalla(x, y);
+    ctx.strokeStyle = "#6b6470"; ctx.lineWidth = 3; ctx.beginPath();
+    ctx.moveTo(px - 10, py - 10); ctx.lineTo(px + 10, py + 10); ctx.moveTo(px + 10, py - 10); ctx.lineTo(px - 10, py + 10);
+    ctx.stroke(); texto(id, x, y + 0.9, "#6b6470", 12); return;
+  }
+  if (cb.estado === "atacando") {               // cono de ataque de ±75°
+    const [px, py] = pantalla(x, y);
+    const angulo = Math.atan2(-cb.dy, cb.dx), abertura = Math.acos(COS_CONO);
+    ctx.beginPath(); ctx.moveTo(px, py);
+    ctx.arc(px, py, 2.5 * S, angulo - abertura, angulo + abertura); ctx.closePath();
+    ctx.fillStyle = "rgba(227,194,122,0.22)"; ctx.fill();
+  }
+  ctx.globalAlpha = cb.estado === "esquivando" ? 0.45 : 1;
+  circulo(x, y, 0.5, color, id === miId ? "#ffffff" : "#000", id === miId ? 3 : 1.5);
+  const [px, py] = pantalla(x, y), [fx, fy] = pantalla(x + cb.dx * 0.8, y + cb.dy * 0.8);
+  ctx.strokeStyle = "#111"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(fx, fy); ctx.stroke();
+  ctx.globalAlpha = 1;
+  texto(id, x, y + 0.95, id === miId ? "#ffffff" : "#bfb8c6", 12);
+  // mini barra de vida sobre cada caballero
+  const ancho = 1.2 * S, [bx, by] = pantalla(x - 0.6, y + 0.75);
+  ctx.fillStyle = "#26222b"; ctx.fillRect(bx, by, ancho, 4);
+  ctx.fillStyle = "#c0392b"; ctx.fillRect(bx, by, ancho * cb.vida / cb.vida_max, 4);
+}
+
+function cuadro() {
+  dibujarSuelo();
+  if (actual) {
+    // se dibuja con un tick de retraso, interpolando entre los dos últimos snapshots
+    const alfa = Math.min(1, (performance.now() - tActual) / TICK_MS);
+    if (actual.jefe) { dibujarAviso(actual.jefe); dibujarJefe(actual.jefe, previo && previo.jefe, alfa); }
+    for (const [id, c] of Object.entries(actual.jugadores))
+      dibujarCaballero(id, c, previo && previo.jugadores[id], alfa);
+  } else {
+    texto("Conéctate a un servidor para empezar", ARENA / 2, ARENA / 2, "#8d8694", 20);
+  }
+  requestAnimationFrame(cuadro);
+}
+requestAnimationFrame(cuadro);
+</script>
+</body>
+</html>

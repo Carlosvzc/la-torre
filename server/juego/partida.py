@@ -11,7 +11,8 @@ from __future__ import annotations
 import random
 
 from . import mejoras
-from .combate import ALCANCE_ATAQUE, ARENA_LADO, Caballero, distancia, numero_seguro
+from .combate import (ALCANCE_ATAQUE, ARENA_LADO, RADIO_CABALLERO, Caballero, distancia,
+                      limitar, numero_seguro)
 from .jefes import JEFE_DEL_DIA, JEFES, DefJefe, Jefe
 
 MAX_JUGADORES = 4             # cooperativo de 1 a 4
@@ -126,6 +127,7 @@ class Partida:
                 c.curar(real * c.robo_vida)
                 self._evento("golpe", jugador=c.id, dano=round(real, 1))
         self.eventos += jefe.paso(dt, list(self.jugadores.values()), self.rng)
+        self._separar(jefe)
 
         if not jefe.vivo:
             self._evento("jefe_vencido", jefe=jefe.definicion.id, piso=self.piso + 1)
@@ -135,6 +137,22 @@ class Partida:
                 self._ofrecer_mejoras()
         elif not any(c.vivo for c in self.jugadores.values()):
             self._terminar("derrota", f"caídos ante {jefe.definicion.nombre}")
+
+    def _separar(self, jefe: Jefe) -> None:
+        """Colisión simple: nadie puede quedar dentro del cuerpo del jefe."""
+        minimo = jefe.definicion.radio + RADIO_CABALLERO
+        for c in self.jugadores.values():
+            if not c.vivo:
+                continue
+            d = distancia(c.x, c.y, jefe.x, jefe.y)
+            if d >= minimo:
+                continue
+            if d < 1e-6:                          # justo encima: se empuja hacia la entrada
+                ux, uy = 0.0, -1.0
+            else:
+                ux, uy = (c.x - jefe.x) / d, (c.y - jefe.y) / d
+            c.x = limitar(jefe.x + ux * minimo, RADIO_CABALLERO, ARENA_LADO - RADIO_CABALLERO)
+            c.y = limitar(jefe.y + uy * minimo, RADIO_CABALLERO, ARENA_LADO - RADIO_CABALLERO)
 
     def _iniciar_piso(self) -> None:
         n = len(self.jugadores)

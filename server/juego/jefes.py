@@ -209,9 +209,10 @@ class Jefe:
     def resumen(self) -> dict:
         datos = {
             "id": self.definicion.id, "nombre": self.definicion.nombre,
-            "x": round(self.x, 2), "y": round(self.y, 2),
+            "x": round(self.x, 2), "y": round(self.y, 2), "radio": self.definicion.radio,
             "vida": round(self.vida, 1), "vida_max": round(self.vida_max, 1),
             "estado": self.estado, "fase": self.fase + 1,
+            "fases": len(self.definicion.fases),
         }
         if self.estado == "preparando":                 # el aviso que permite esquivar
             datos["aviso"] = {
