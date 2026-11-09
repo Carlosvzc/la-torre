@@ -1,0 +1,7 @@
+# Solo entra a la imagen lo que el servidor necesita para correr
+tests/
+__pycache__/
+*.pyc
+.pytest_cache/
+Dockerfile
+.dockerignore
