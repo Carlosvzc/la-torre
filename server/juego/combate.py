@@ -56,7 +56,7 @@ class Caballero:
     vida: float = 100.0
     stamina_max: float = 100.0
     stamina: float = 100.0
-    dano: float = 12.0
+    dano: float = 15.0
     defensa: float = 0.0            # fracción de daño que se ignora (0.0 a 0.6)
     velocidad: float = 5.0          # unidades por segundo
     regen_mult: float = 1.0         # multiplicador de la regeneración de stamina

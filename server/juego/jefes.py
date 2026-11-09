@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 from .combate import ARENA_LADO, RADIO_CABALLERO, Caballero, distancia, limitar, normalizar
 
-PAUSA_ENTRE_ATAQUES = 0.6      # segundos que el jefe persigue antes de volver a atacar
+PAUSA_ENTRE_ATAQUES = 1.0      # segundos que el jefe persigue antes de volver a atacar
 
 
 @dataclass(frozen=True)
@@ -44,12 +44,13 @@ class DefJefe:
 
 
 # --- Catálogo de ataques -----------------------------------------------------
-BARRIDO = Ataque("barrido", "barrido", 0.9, 0.7, 3.0, 18, 3.0)
-GOLPE = Ataque("golpe pesado", "golpe", 0.8, 0.8, 1.5, 22, 4.0)
-EMBESTIDA = Ataque("embestida", "embestida", 1.0, 0.9, 1.8, 25, 12.0)
-LLUVIA = Ataque("lluvia de ceniza", "lluvia", 1.1, 0.6, 1.6, 20, 14.0)
-ZARPAZO = Ataque("zarpazo", "golpe", 0.5, 0.5, 1.4, 18, 3.0)
-SALTO = Ataque("salto feroz", "embestida", 0.7, 0.7, 1.6, 24, 12.0)
+# La recuperación es la ventana para castigar al jefe: los golpes fuertes dejan más hueco.
+BARRIDO = Ataque("barrido", "barrido", 0.9, 1.0, 3.0, 18, 3.0)
+GOLPE = Ataque("golpe pesado", "golpe", 0.8, 1.2, 1.5, 22, 4.0)
+EMBESTIDA = Ataque("embestida", "embestida", 1.0, 1.3, 1.8, 25, 12.0)
+LLUVIA = Ataque("lluvia de ceniza", "lluvia", 1.1, 0.9, 1.6, 20, 14.0)
+ZARPAZO = Ataque("zarpazo", "golpe", 0.5, 0.7, 1.4, 18, 3.0)
+SALTO = Ataque("salto feroz", "embestida", 0.7, 1.0, 1.6, 24, 12.0)
 
 # --- Los 4 jefes de la torre (nombres y diseño originales) ---------------------
 JEFES: tuple[DefJefe, ...] = (
@@ -81,7 +82,7 @@ JEFE_DEL_DIA = DefJefe("coloso", "Coloso del Eclipse", 600, 3.0, 1.5, (
 
 def escalado(piso: int, jugadores: int) -> tuple[float, float, float]:
     """Multiplicadores (vida, daño, velocidad) según el piso (0–3) y los jugadores (1–4)."""
-    vida = (1 + 0.4 * piso) * (1 + 0.7 * (max(1, jugadores) - 1))
+    vida = (1 + 0.3 * piso) * (1 + 0.7 * (max(1, jugadores) - 1))
     dano = 1 + 0.15 * piso
     velocidad = 1 + 0.08 * piso
     return vida, dano, velocidad
