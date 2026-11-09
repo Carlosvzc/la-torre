@@ -115,9 +115,11 @@ la-torre/
 - [x] `mejoras.py`: catálogo de 9 y sorteo de 3 (semilla para tests) + tests
 - [x] `partida.py`: run de 1–4 jugadores, jefe → mejora → siguiente jefe → fin + tests
 - [x] Balance: bot de prueba con reflejos perfectos gana 10/10 semillas, runs de 5–8.5 min
-- [ ] `server.py`: WebSocket, tick 20/s, protocolo JSON, ping/pong, métricas, SDK Agones
-- [ ] Cliente de consola mínimo (`tools/cliente_texto.py`) para jugar una run a mano
-- [ ] Dockerfile; `docker build` + `docker run` + `/metrics` → **capturas 3.3 (1 y 2)**
+- [x] `server.py`: WebSocket, tick 20/s, protocolo JSON, ping/pong, métricas, SDK Agones, espectadores
+- [x] Pruebas de red con cliente WebSocket real (11 pruebas; 51 en total)
+- [x] Bot cliente por WebSocket (`loadtest/jugar_bot.py` + `estrategia.py`, reutilizable por Locust)
+- [x] Dockerfile (imagen de 189 MB); `docker build` + `docker run` + `/metrics` funcionando
+- [ ] Tomar **capturas 3.3 (1 y 2)** siguiendo `docs/capturas.md`
 - [ ] Locust local: `Jugador` hace una run completa con acciones aleatorias contra el contenedor
 - [ ] Commit por cada pieza
 
