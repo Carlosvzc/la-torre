@@ -29,7 +29,7 @@ def jugador_experto(p: Partida, jugador_id: str) -> None:
         # no se compromete a un golpe si el impacto del jefe llega antes de terminarlo,
         # y guarda resistencia para poder esquivar después
         if not impacto_cerca and c.stamina >= C.COSTO_ATAQUE + C.COSTO_ESQUIVA:
-            p.recibir(jugador_id, {"accion": "atacar"})
+            p.recibir(jugador_id, {"accion": "atacar", "dx": jefe.x - c.x, "dy": jefe.y - c.y})
 
 
 def jugar(p: Partida, segundos: float, bot=None) -> None:

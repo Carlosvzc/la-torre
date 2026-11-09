@@ -33,8 +33,26 @@ def limitar(valor: float, minimo: float, maximo: float) -> float:
     return max(minimo, min(maximo, valor))
 
 
+COS_CONO_ATAQUE = math.cos(math.radians(75))   # el golpe alcanza en un cono de ±75° al frente
+
+
+def numero_seguro(valor, defecto: float = 0.0) -> float:
+    """Convierte lo que mande el cliente a un número finito.
+
+    El cliente no es de fiar: "abc", None, "nan" o "inf" se vuelven `defecto`.
+    Un NaN en el estado rompería el JSON de todos los jugadores.
+    """
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError):
+        return defecto
+    return numero if math.isfinite(numero) else defecto
+
+
 def normalizar(dx: float, dy: float) -> tuple[float, float]:
-    """Devuelve el vector unitario (o (0, 0) si no hay dirección)."""
+    """Devuelve el vector unitario (o (0, 0) si no hay dirección válida)."""
+    if not (math.isfinite(dx) and math.isfinite(dy)):
+        return 0.0, 0.0
     largo = math.hypot(dx, dy)
     if largo < 1e-9:
         return 0.0, 0.0
@@ -115,6 +133,9 @@ class Caballero:
             return
         tipo = accion.get("accion")
         if tipo == "atacar" and self.gastar(COSTO_ATAQUE):
+            dx, dy = normalizar(accion.get("dx", 0.0), accion.get("dy", 0.0))
+            if (dx, dy) != (0.0, 0.0):          # el jugador apunta el golpe (fijar objetivo)
+                self.dir_x, self.dir_y = dx, dy
             self.estado = "atacando"
             self.temporizador = PREPARACION_ATAQUE + RECUPERACION_ATAQUE
             self.golpe_pendiente = True
@@ -187,6 +208,21 @@ class Caballero:
     def curar(self, cantidad: float) -> None:
         if self.vivo:
             self.vida = min(self.vida_max, self.vida + cantidad)
+
+    def de_frente_a(self, x: float, y: float) -> bool:
+        """True si el punto (x, y) está dentro del cono de ataque del caballero."""
+        hx, hy = normalizar(x - self.x, y - self.y)
+        if (hx, hy) == (0.0, 0.0):
+            return True                          # encima del objetivo: siempre alcanza
+        return hx * self.dir_x + hy * self.dir_y >= COS_CONO_ATAQUE
+
+    def reiniciar_accion(self) -> None:
+        """Corta cualquier acción en curso (se usa al cambiar de piso)."""
+        if self.vivo:
+            self.estado, self.temporizador = "libre", 0.0
+        self.golpe_pendiente = False
+        self.accion_en_cola = None
+        self.fijar_movimiento(0, 0)
 
     def revivir(self, fraccion: float) -> None:
         """Vuelve a la vida con una fracción de su vida máxima (cooperativo)."""

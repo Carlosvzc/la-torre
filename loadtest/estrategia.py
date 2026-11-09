@@ -49,5 +49,5 @@ def decidir(snap: dict, mi_id: str, habilidad: float = 1.0,
     prudente = rng.random() < habilidad
     if yo["estado"] == "libre" and yo["st"] >= COSTO_ATAQUE + COSTO_ESQUIVA \
             and not (impacto_cerca and prudente):
-        return {"accion": "atacar"}
+        return {"accion": "atacar", "dx": dx, "dy": dy}    # apunta el golpe al jefe
     return {"accion": "mover", "dx": 0, "dy": 0}

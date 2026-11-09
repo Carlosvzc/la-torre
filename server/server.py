@@ -12,6 +12,7 @@ Protocolo (JSON por WebSocket, puerto 7654):
 
 Ciclo de vida en Agones (SDK REST en el contenedor auxiliar):
     /ready al arrancar → la run se asigna (Allocated) → /health cada 2 s → /shutdown al terminar.
+    Si un jugador entra sin pasar por el allocator, el servidor llama /allocate él mismo.
 Fuera de Agones las llamadas fallan en silencio y, al terminar una run, se empieza otra
 para poder probar en local con Docker y Locust.
 """
@@ -50,9 +51,11 @@ TICK = Histogram("torre_tick_seconds", "Duración del tick (simulación + envío
                  buckets=(.0005, .001, .0025, .005, .01, .025, .05, .1))
 BYTES = Counter("torre_bytes_sent_total", "Bytes enviados a los clientes", ["rol"])
 MENSAJES = Counter("torre_messages_received_total", "Mensajes recibidos de los clientes")
+RECHAZADOS = Counter("torre_messages_rejected_total", "Mensajes que provocaron un error y se ignoraron")
 RUNS = Counter("torre_runs_total", "Runs terminadas", ["modo", "resultado"])
 PISO = Gauge("torre_current_floor", "Piso actual de la run (0 = sala de espera)")
-DURACION_RUN = Histogram("torre_run_seconds", "Duración de las runs terminadas",
+DURACION_RUN = Histogram("torre_run_seconds",
+                         "Duración de las runs terminadas, desde que entra el primer jugador",
                          buckets=(30, 60, 120, 240, 360, 480, 600, 900))
 
 
@@ -90,18 +93,20 @@ class Servidor:
         self.jugadores: dict[str, websockets.WebSocketServerProtocol] = {}
         self.espectadores: set = set()
         self.con_agones = False
+        self.asignado = False          # ya se llamó a /allocate en esta run
         self.cerrando = False
         self.n_tick = 0
         self.eventos_espectador: list[dict] = []
-        self.inicio_run = time.monotonic()
 
     # --- Conexiones ------------------------------------------------------------
     async def atender(self, ws) -> None:
         """Primer mensaje = presentación; después, acciones o pings."""
         try:
-            hola = json.loads(await asyncio.wait_for(ws.recv(), timeout=5)).get("hola", {})
+            hola = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))["hola"]
+            if not isinstance(hola, dict):
+                raise ValueError("hola debe ser un objeto")
         except Exception:
-            await ws.close(code=4002, reason="se esperaba {\"hola\": ...}")
+            await ws.close(code=4002, reason="se esperaba {\"hola\": {...}}")
             return
         rol = hola.get("rol", "jugador")
         jugador_id = str(hola.get("id", ""))[:24]
@@ -121,6 +126,11 @@ class Servidor:
 
         self.jugadores[jugador_id] = ws
         JUGADORES.set(len(self.jugadores))
+        if self.con_agones and not self.asignado:
+            # Si alguien entró sin pasar por el allocator, el servidor se marca Allocated
+            # él mismo: así el FleetAutoscaler no puede borrarlo con gente jugando.
+            self.asignado = True
+            await asyncio.to_thread(agones, "/allocate")
         await self._enviar(ws, {"bienvenida": {"id": jugador_id, "rol": "jugador",
                                                "modo": self.modo}}, "jugador")
         try:
@@ -159,7 +169,11 @@ class Servidor:
             await self._enviar(ws, {"pong": d["ping"]},
                                "jugador" if jugador_id else "espectador")
         elif jugador_id is not None:
-            self.partida.recibir(jugador_id, d)
+            try:
+                self.partida.recibir(jugador_id, d)
+            except Exception:                    # un mensaje raro nunca saca al jugador
+                RECHAZADOS.inc()
+                log.exception("mensaje inválido de %s ignorado", jugador_id)
 
     async def _enviar(self, ws, datos: dict, rol: str) -> None:
         texto = json.dumps(datos, separators=(",", ":"))
@@ -195,7 +209,7 @@ class Servidor:
         """Registra la run, avisa a la tabla de líderes y libera el servidor."""
         p = self.partida
         RUNS.labels(self.modo, p.estado).inc()
-        DURACION_RUN.observe(time.monotonic() - self.inicio_run)
+        DURACION_RUN.observe(p.tiempo_total)      # no cuenta el tiempo en Ready sin jugadores
         if p.estado != "abandonada" and p.jugadores:
             await asyncio.to_thread(reportar_resultado, p.resultado())
         log.info("run terminada: %s (%s)", p.estado, p.motivo_fin)
@@ -210,7 +224,7 @@ class Servidor:
             for ws in list(self.jugadores.values()):
                 await ws.close(code=1000, reason="fin de la run")
             self.partida = Partida(modo=self.modo, semilla=self.semilla)
-            self.inicio_run = time.monotonic()
+            self.asignado = False
 
     async def bucle(self) -> None:
         siguiente = time.perf_counter()

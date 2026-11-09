@@ -11,7 +11,7 @@ from __future__ import annotations
 import random
 
 from . import mejoras
-from .combate import ALCANCE_ATAQUE, ARENA_LADO, Caballero, distancia
+from .combate import ALCANCE_ATAQUE, ARENA_LADO, Caballero, distancia, numero_seguro
 from .jefes import JEFE_DEL_DIA, JEFES, DefJefe, Jefe
 
 MAX_JUGADORES = 4             # cooperativo de 1 a 4
@@ -74,24 +74,28 @@ class Partida:
     def recibir(self, jugador_id: str, msg: dict) -> None:
         """Procesa una acción del cliente. Lo inválido se ignora en silencio."""
         c = self.jugadores.get(jugador_id)
-        if c is None or self.terminada:
+        if c is None or self.terminada or not isinstance(msg, dict):
             return
         accion = msg.get("accion")
+        dx, dy = numero_seguro(msg.get("dx")), numero_seguro(msg.get("dy"))
         if accion == "listo" and self.estado == "esperando":
             self.listos.add(jugador_id)
         elif accion == "mover":
-            c.fijar_movimiento(float(msg.get("dx", 0)), float(msg.get("dy", 0)))
+            c.fijar_movimiento(dx, dy)
         elif accion in ("atacar", "esquivar") and self.estado == "combate":
-            c.pedir({"accion": accion, "dx": float(msg.get("dx", 0)),
-                     "dy": float(msg.get("dy", 0))})
+            c.pedir({"accion": accion, "dx": dx, "dy": dy})
         elif accion == "elegir_mejora" and self.estado == "mejora":
-            if msg.get("id") in self.ofertas.get(jugador_id, []) and jugador_id not in self.elegidas:
-                self.elegidas[jugador_id] = msg["id"]
+            mejora = msg.get("id")
+            if (isinstance(mejora, str) and mejora in self.ofertas.get(jugador_id, [])
+                    and jugador_id not in self.elegidas):
+                self.elegidas[jugador_id] = mejora
 
     # --- Simulación --------------------------------------------------------
     def paso(self, dt: float) -> None:
         if self.terminada:
             return
+        if self.estado == "esperando" and not self.jugadores:
+            return        # servidor Ready sin nadie: el reloj de la run aún no corre
         self.tiempo_total += dt
         if self.tiempo_total >= DURACION_MAXIMA:
             self._terminar("derrota", "tiempo agotado")
@@ -115,7 +119,8 @@ class Partida:
         jefe = self.jefe
         alcance = ALCANCE_ATAQUE + jefe.definicion.radio
         for c in self.jugadores.values():
-            if c.paso(dt) and distancia(c.x, c.y, jefe.x, jefe.y) <= alcance:
+            if (c.paso(dt) and distancia(c.x, c.y, jefe.x, jefe.y) <= alcance
+                    and c.de_frente_a(jefe.x, jefe.y)):
                 real = jefe.recibir_dano(c.dano)
                 c.dano_causado += real
                 c.curar(real * c.robo_vida)
@@ -137,7 +142,8 @@ class Partida:
         separacion = ARENA_LADO / (n + 1)
         for i, c in enumerate(self.jugadores.values()):     # todos vuelven a la entrada
             c.x, c.y = separacion * (i + 1), 3.0
-            c.fijar_movimiento(0, 0)
+            c.reiniciar_accion()                  # nada de golpes pendientes del piso anterior
+            c.dir_x, c.dir_y = 0.0, 1.0           # todos miran hacia el jefe
             c.stamina = c.stamina_max
         self.estado = "combate"
         self._evento("piso", piso=self.piso + 1, jefe=self.jefe.definicion.nombre)
