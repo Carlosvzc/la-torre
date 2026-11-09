@@ -119,6 +119,7 @@ la-torre/
 - [x] Pruebas de red con cliente WebSocket real (11 pruebas; 51 en total)
 - [x] Bot cliente por WebSocket (`loadtest/jugar_bot.py` + `estrategia.py`, reutilizable por Locust)
 - [x] Dockerfile (imagen de 189 MB); `docker build` + `docker run` + `/metrics` funcionando
+- [x] Auditoría (9 nov): 8 fallos corregidos con 21 pruebas de regresión (72 en total), imagen 1.1
 - [ ] Tomar **capturas 3.3 (1 y 2)** siguiendo `docs/capturas.md`
 - [ ] Locust local: `Jugador` hace una run completa con acciones aleatorias contra el contenedor
 - [ ] Commit por cada pieza
