@@ -1,0 +1,1147 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La Torre</title>
+<!--
+  Cliente 3D de La Torre: estética 3D retro de 64 bits (low-poly, niebla, sombra redonda)
+  con texturas generadas en alta resolución. Todos los modelos y texturas se generan por
+  código: no usa assets de terceros.
+  El cliente no decide nada: manda acciones y dibuja el snapshot del servidor autoritativo.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --oro: #d8b46a; --oro-tenue: #8c7444; --sangre: #a3231b; --vida: #b3261e; --stamina: #4e8f3a;
+          --panel: rgba(12, 10, 14, .82); --texto: #e9e2d2; --tenue: #9a9187; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #07060a; color: var(--texto); overflow: hidden;
+               font: 14px/1.4 system-ui, "Segoe UI", sans-serif; }
+  #lienzo { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  #lienzo.pixelado { image-rendering: pixelated; }
+  .titulo { font-family: Cinzel, Georgia, serif; letter-spacing: .12em; }
+  .oculto { display: none !important; }
+
+  /* Pantalla de inicio */
+  #inicio { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 18px; background: radial-gradient(ellipse at center, rgba(0,0,0,.15), rgba(0,0,0,.75)); }
+  #inicio h1 { margin: 0; font-size: clamp(42px, 8vw, 88px); color: var(--oro); text-shadow: 0 0 24px rgba(216,180,106,.25); }
+  #inicio p { margin: 0; color: var(--tenue); }
+  .formulario { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; padding: 14px;
+                background: var(--panel); border: 1px solid #3a3024; border-radius: 4px; }
+  input, select, button { background: #15121a; color: var(--texto); border: 1px solid #3a3024; border-radius: 3px;
+                          padding: 7px 10px; font: inherit; }
+  button { cursor: pointer; font-family: Cinzel, Georgia, serif; letter-spacing: .08em; }
+  button:hover { border-color: var(--oro); color: var(--oro); }
+
+  /* HUD del jugador */
+  #hud { position: fixed; left: 20px; top: 18px; width: min(360px, 60vw); pointer-events: none; }
+  .barra { height: 12px; background: rgba(0,0,0,.6); border: 1px solid #3a3024; margin: 4px 0 8px; position: relative; }
+  .barra > div { position: absolute; inset: 0 auto 0 0; transition: width .12s linear; }
+  .barra .eco { background: #e9e2d2; opacity: .35; transition: width .6s ease-out .25s; }
+  #aliados { font-size: 12px; color: var(--tenue); }
+  #aliados .barra { height: 6px; margin: 2px 0 6px; }
+
+  /* Jefe (abajo, al centro) */
+  #hudJefe { position: fixed; left: 50%; bottom: 46px; transform: translateX(-50%); width: min(720px, 86vw);
+             pointer-events: none; text-align: left; }
+  #hudJefe .nombre { font-size: 18px; color: var(--texto); text-shadow: 0 1px 2px #000; }
+  #hudJefe .barra { height: 10px; }
+  #hudJefe .fases { font-size: 12px; color: var(--tenue); float: right; }
+
+  #info { position: fixed; right: 18px; top: 16px; text-align: right; color: var(--tenue); font-size: 12px; pointer-events: none; }
+  #info .piso { font-family: Cinzel, Georgia, serif; font-size: 16px; color: var(--oro); }
+  #ayuda { position: fixed; right: 18px; bottom: 14px; color: #6f675e; font-size: 12px; text-align: right; pointer-events: none; }
+  #eventos { position: fixed; left: 20px; top: 110px; width: 340px; font-size: 13px; pointer-events: none;
+             display: flex; flex-direction: column; gap: 2px; }
+  #eventos div { color: #c9c0b2; text-shadow: 0 1px 2px #000; animation: desvanecer 6s forwards; }
+  @keyframes desvanecer { 0%, 70% { opacity: 1 } 100% { opacity: 0 } }
+
+  /* Mensajes grandes y capas */
+  #banner { position: fixed; left: 0; right: 0; top: 34%; text-align: center; pointer-events: none; opacity: 0;
+            transition: opacity .8s; }
+  #banner.visible { opacity: 1; }
+  #banner .grande { font-size: clamp(30px, 6vw, 64px); }
+  #banner .chico { color: var(--tenue); font-size: 16px; margin-top: 6px; }
+  #banner .franja { background: linear-gradient(90deg, transparent, rgba(0,0,0,.7) 20%, rgba(0,0,0,.7) 80%, transparent);
+                    padding: 18px 0; }
+  #capa { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column;
+          gap: 16px; text-align: center; background: rgba(5, 4, 8, .55); }
+  #capa h2 { margin: 0; color: var(--oro); font-size: 30px; }
+  .cartas { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .carta { width: 190px; padding: 18px 14px; background: var(--panel); border: 1px solid #3a3024; cursor: pointer;
+           transition: transform .12s, border-color .12s; }
+  .carta:hover { transform: translateY(-4px); border-color: var(--oro); }
+  .carta b { display: block; font-family: Cinzel, Georgia, serif; color: var(--oro); font-size: 16px; margin-bottom: 8px; }
+  .carta small { color: var(--tenue); }
+  .carta .tecla { color: #6f675e; font-size: 12px; margin-top: 10px; display: block; }
+  kbd { background: #1b1720; border: 1px solid #3a3024; border-radius: 3px; padding: 0 5px; font-size: 12px; }
+
+  #numeros { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .numero { position: absolute; font-family: Cinzel, Georgia, serif; font-weight: 700; font-size: 20px;
+            text-shadow: 0 2px 3px #000; transform: translate(-50%, -50%); }
+  #error { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px; }
+</style>
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="lienzo"></canvas>
+
+<div id="inicio">
+  <h1 class="titulo">LA TORRE</h1>
+  <p>Cuatro jefes. Una subida. Ninguna segunda oportunidad.</p>
+  <div class="formulario">
+    <input id="url" value="ws://localhost:7654" size="20" aria-label="Servidor">
+    <input id="nombre" placeholder="tu nombre" size="12" maxlength="24" aria-label="Nombre">
+    <select id="rol" aria-label="Rol"><option value="jugador">Jugador</option><option value="espectador">Espectador</option></select>
+    <button id="botonEntrar">Entrar</button>
+  </div>
+  <p id="estadoConexion">&nbsp;</p>
+</div>
+
+<div id="hud" class="oculto">
+  <div class="titulo" id="miNombre"></div>
+  <div class="barra"><div class="eco" id="ecoVida"></div><div id="barraVida" style="background:var(--vida)"></div></div>
+  <div class="barra" style="height:8px"><div id="barraStamina" style="background:var(--stamina)"></div></div>
+  <div id="aliados"></div>
+</div>
+<div id="hudJefe" class="oculto">
+  <span class="nombre titulo" id="nombreJefe"></span><span class="fases" id="fasesJefe"></span>
+  <div class="barra"><div class="eco" id="ecoJefe"></div><div id="barraJefe" style="background:var(--sangre)"></div></div>
+</div>
+<div id="info" class="oculto"><div class="piso" id="piso"></div><div id="detalle"></div></div>
+<div id="eventos"></div>
+<div id="ayuda" class="oculto">
+  <kbd>W A S D</kbd> mover (fijado al jefe) · <kbd>J</kbd>/clic atacar · <kbd>Espacio</kbd> esquivar<br>
+  <kbd>Enter</kbd> listo · <kbd>1 2 3</kbd> mejora · <kbd>P</kbd> pixelado · <kbd>M</kbd> sonido
+</div>
+<div id="banner"><div class="franja"><div class="grande titulo" id="bannerGrande"></div><div class="chico" id="bannerChico"></div></div></div>
+<div id="capa" class="oculto"></div>
+<div id="numeros"></div>
+
+<script type="module">
+import * as THREE from "three";
+
+// =====================================================================================
+//  Constantes y utilidades
+// =====================================================================================
+const ARENA = 20, MITAD = ARENA / 2, TICK_MS = 50;
+const COLORES_JUGADOR = [0x9b2c2c, 0x2c5f9b, 0x6a3c8f, 0x3c7a3c];
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const limitar = (v, a, b) => Math.max(a, Math.min(b, v));
+const suave = (t) => t * t * (3 - 2 * t);
+const salida = (t) => 1 - (1 - t) * (1 - t);
+const lerp = (a, b, t) => a + (b - a) * t;
+// El servidor usa un plano (x, y) de 0 a 20 con el jefe hacia +y; en 3D: X = x - 10, Z = 10 - y
+const mundo = (x, y, alto = 0) => new THREE.Vector3(x - MITAD, alto, MITAD - y);
+const giroHacia = (dx, dy) => Math.atan2(dx, -dy);           // los modelos miran a +Z local
+function lerpAngulo(a, b, t) {
+  const d = ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+  return a + d * t;
+}
+function azar(semilla) {                                       // generador reproducible (mulberry32)
+  return () => {
+    semilla |= 0; semilla = (semilla + 0x6d2b79f5) | 0;
+    let t = Math.imul(semilla ^ (semilla >>> 15), 1 | semilla);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// =====================================================================================
+//  Render, escena, niebla y luces
+// =====================================================================================
+const lienzo = $("lienzo");
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: true }); }
+catch (e) {
+  document.body.innerHTML = `<div id="error">Tu navegador no pudo iniciar WebGL.<br>Prueba el cliente 2D en cliente/prueba2d.</div>`;
+  throw e;
+}
+let modoPixelado = false;
+function ajustarTamano() {
+  renderer.setPixelRatio(modoPixelado ? 0.38 : Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight, false);
+  camara.aspect = innerWidth / innerHeight;
+  camara.updateProjectionMatrix();
+}
+const escena = new THREE.Scene();
+const COLOR_NIEBLA = 0x0b0910;
+escena.background = new THREE.Color(COLOR_NIEBLA);
+escena.fog = new THREE.Fog(COLOR_NIEBLA, 16, 42);              // la niebla esconde el fondo, como en los 90
+const camara = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 120);
+camara.position.set(0, 9, 18);
+ajustarTamano();
+addEventListener("resize", ajustarTamano);
+
+escena.add(new THREE.HemisphereLight(0x7d7290, 0x1b1418, 1.1));
+const luna = new THREE.DirectionalLight(0x8090c0, 0.7);
+luna.position.set(-6, 14, 4);
+escena.add(luna);
+
+// =====================================================================================
+//  Texturas generadas en alta resolución (sin descargar nada)
+// =====================================================================================
+const anisotropia = renderer.capabilities.getMaxAnisotropy();
+function textura(tam, dibujar, repetir = 1) {
+  const c = document.createElement("canvas");
+  c.width = c.height = tam;
+  dibujar(c.getContext("2d"), tam);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = anisotropia;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repetir, repetir);
+  return t;
+}
+function ruido(g, tam, cantidad, rnd, claro = 0.08, oscuro = 0.12) {
+  for (let i = 0; i < cantidad; i++) {
+    const x = rnd() * tam, y = rnd() * tam, s = 1 + rnd() * 3;
+    g.fillStyle = rnd() < 0.5 ? `rgba(255,255,255,${rnd() * claro})` : `rgba(0,0,0,${rnd() * oscuro})`;
+    g.fillRect(x, y, s, s);
+  }
+}
+function texturaLosas(repetir) {
+  return textura(1024, (g, tam) => {
+    const rnd = azar(7), n = 8, lado = tam / n;
+    g.fillStyle = "#121014"; g.fillRect(0, 0, tam, tam);
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const x = i * lado + 3, y = j * lado + 3, w = lado - 6, h = lado - 6, l = 20 + rnd() * 10;
+      g.fillStyle = `hsl(${25 + rnd() * 15}, ${6 + rnd() * 6}%, ${l}%)`;
+      g.fillRect(x, y, w, h);
+      g.fillStyle = "rgba(255,255,255,0.06)"; g.fillRect(x, y, w, 3); g.fillRect(x, y, 3, h);   // bisel
+      g.fillStyle = "rgba(0,0,0,0.25)"; g.fillRect(x, y + h - 4, w, 4); g.fillRect(x + w - 4, y, 4, h);
+      if (rnd() < 0.35) {                                                // grieta
+        g.strokeStyle = "rgba(0,0,0,0.55)"; g.lineWidth = 1.5; g.beginPath();
+        let cx = x + rnd() * w, cy = y + rnd() * h; g.moveTo(cx, cy);
+        for (let k = 0; k < 5; k++) { cx += (rnd() - 0.5) * 50; cy += (rnd() - 0.5) * 50; g.lineTo(cx, cy); }
+        g.stroke();
+      }
+      if (rnd() < 0.2) {                                                 // mancha oscura
+        const gr = g.createRadialGradient(x + w / 2, y + h / 2, 2, x + w / 2, y + h / 2, w * 0.6);
+        gr.addColorStop(0, "rgba(10,5,5,0.45)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+        g.fillStyle = gr; g.fillRect(x, y, w, h);
+      }
+    }
+    ruido(g, tam, 60000, rnd);
+  }, repetir);
+}
+function texturaLadrillo(repetir) {
+  return textura(1024, (g, tam) => {
+    const rnd = azar(11), filas = 16, alto = tam / filas;
+    g.fillStyle = "#0e0c10"; g.fillRect(0, 0, tam, tam);
+    for (let f = 0; f < filas; f++) {
+      const desfase = f % 2 ? 64 : 0;
+      for (let x = -desfase; x < tam; x += 128) {
+        g.fillStyle = `hsl(${20 + rnd() * 20}, 7%, ${17 + rnd() * 9}%)`;
+        g.fillRect(x + 3, f * alto + 3, 122, alto - 6);
+        g.fillStyle = "rgba(255,255,255,0.05)"; g.fillRect(x + 3, f * alto + 3, 122, 3);
+      }
+    }
+    ruido(g, tam, 50000, rnd);
+  }, repetir);
+}
+const texMetal = textura(512, (g, tam) => {
+  const rnd = azar(3);
+  g.fillStyle = "#b9b9bd"; g.fillRect(0, 0, tam, tam);
+  ruido(g, tam, 30000, rnd, 0.12, 0.16);
+  g.strokeStyle = "rgba(255,255,255,0.18)"; g.lineWidth = 1;            // arañazos
+  for (let i = 0; i < 90; i++) {
+    const x = rnd() * tam, y = rnd() * tam, l = 10 + rnd() * 40, a = rnd() * Math.PI;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+  }
+});
+const texTela = textura(512, (g, tam) => {
+  const rnd = azar(5);
+  g.fillStyle = "#c8c8c8"; g.fillRect(0, 0, tam, tam);
+  for (let y = 0; y < tam; y += 3) { g.fillStyle = `rgba(0,0,0,${0.04 + rnd() * 0.05})`; g.fillRect(0, y, tam, 1); }
+  for (let x = 0; x < tam; x += 3) { g.fillStyle = `rgba(0,0,0,${0.03 + rnd() * 0.04})`; g.fillRect(x, 0, 1, tam); }
+  ruido(g, tam, 15000, rnd);
+});
+const texSombra = (() => {                                       // sombra redonda bajo cada personaje
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const g = c.getContext("2d"), gr = g.createRadialGradient(64, 64, 4, 64, 64, 62);
+  gr.addColorStop(0, "rgba(0,0,0,0.75)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+})();
+
+// =====================================================================================
+//  Materiales y piezas
+// =====================================================================================
+function mat(color, extra = {}) {
+  return new THREE.MeshPhongMaterial({ color, flatShading: true, shininess: 10, specular: 0x222222, ...extra });
+}
+function pieza(geo, material, x = 0, y = 0, z = 0, padre = null) {
+  const m = new THREE.Mesh(geo, material);
+  m.position.set(x, y, z);
+  if (padre) padre.add(m);
+  return m;
+}
+function sombraRedonda(radio) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(radio * 2.6, radio * 2.6),
+    new THREE.MeshBasicMaterial({ map: texSombra, transparent: true, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.02;
+  return m;
+}
+
+// =====================================================================================
+//  La arena
+// =====================================================================================
+const llamas = [];                       // braseros: luz que parpadea + llamas que bailan
+(function construirArena() {
+  const piedra = mat(0xffffff, { map: texturaLosas(2.5), shininess: 4 });
+  const suelo = pieza(new THREE.PlaneGeometry(ARENA, ARENA), piedra);
+  suelo.rotation.x = -Math.PI / 2; escena.add(suelo);
+  const fuera = pieza(new THREE.PlaneGeometry(90, 90), mat(0x55505a, { map: texturaLosas(11), shininess: 2 }), 0, -0.02, 0);
+  fuera.rotation.x = -Math.PI / 2; escena.add(fuera);
+
+  // Sello dorado en el centro de la arena
+  const sello = pieza(new THREE.RingGeometry(3.2, 3.35, 64),
+    new THREE.MeshBasicMaterial({ color: 0x8c7444, transparent: true, opacity: 0.35 }), 0, 0.015, 0);
+  sello.rotation.x = -Math.PI / 2; escena.add(sello);
+  const sello2 = sello.clone(); sello2.geometry = new THREE.RingGeometry(2.2, 2.26, 6); escena.add(sello2);
+
+  const ladrillo = texturaLadrillo(1), muro = mat(0xffffff, { map: ladrillo });
+  const rnd = azar(21);
+  // Muro bajo alrededor
+  for (const [x, z, w, d] of [[0, -10.35, 21, 0.5], [0, 10.35, 21, 0.5], [-10.35, 0, 0.5, 21], [10.35, 0, 0.5, 21]]) {
+    escena.add(pieza(new THREE.BoxGeometry(w, 0.7, d), muro, x, 0.35, z));
+  }
+  // Columnas alrededor, algunas rotas
+  for (let i = -2; i <= 2; i++) {
+    for (const [x, z] of [[i * 5, -11.4], [i * 5, 11.4], [-11.4, i * 5], [11.4, i * 5]]) {
+      if (Math.abs(x) === 10 && Math.abs(z) === 11.4) continue;
+      const alto = rnd() < 0.3 ? 1.5 + rnd() * 1.5 : 5 + rnd() * 2;
+      const col = pieza(new THREE.CylinderGeometry(0.5, 0.6, alto, 6), muro, x, alto / 2, z);
+      if (alto < 4) col.rotation.z = (rnd() - 0.5) * 0.15;
+      escena.add(col);
+      escena.add(pieza(new THREE.BoxGeometry(1.4, 0.3, 1.4), muro, x, 0.15, z));
+    }
+  }
+  // Puerta del fondo (por donde aparece cada jefe)
+  const puerta = new THREE.Group(); puerta.position.set(0, 0, -13);
+  pieza(new THREE.BoxGeometry(1.2, 8, 1.2), muro, -2.6, 4, 0, puerta);
+  pieza(new THREE.BoxGeometry(1.2, 8, 1.2), muro, 2.6, 4, 0, puerta);
+  pieza(new THREE.BoxGeometry(6.6, 1.2, 1.4), muro, 0, 8.4, 0, puerta);
+  pieza(new THREE.PlaneGeometry(4, 7.8), new THREE.MeshBasicMaterial({ color: 0x1a0d22 }), 0, 3.9, 0.1, puerta);
+  escena.add(puerta);
+  // Estandartes rasgados
+  const tela = mat(0x5a1414, { map: texTela, side: THREE.DoubleSide });
+  for (const x of [-7.5, 7.5]) {
+    const est = pieza(new THREE.PlaneGeometry(1.3, 3.2, 1, 4), tela, x, 3.2, -11.35);
+    const pos = est.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) if (pos.getY(i) < -1.5) pos.setY(i, pos.getY(i) + (i % 2 ? 0.35 : 0));
+    escena.add(est);
+  }
+  // Fondo lejano: un muro circular que se pierde en la niebla
+  const fondo = pieza(new THREE.CylinderGeometry(34, 34, 30, 24, 1, true), mat(0x3a3540, { map: texturaLadrillo(6), side: THREE.BackSide }), 0, 12, 0);
+  escena.add(fondo);
+  // Braseros en las esquinas
+  for (const [x, z] of [[-9.6, -9.6], [9.6, -9.6], [-9.6, 9.6], [9.6, 9.6]]) {
+    const b = new THREE.Group(); b.position.set(x, 0, z);
+    pieza(new THREE.CylinderGeometry(0.25, 0.4, 1.4, 6), muro, 0, 0.7, 0, b);
+    pieza(new THREE.CylinderGeometry(0.6, 0.35, 0.35, 6), mat(0x3a3028, { map: texMetal }), 0, 1.55, 0, b);
+    const fuego = new THREE.Group(); fuego.position.y = 1.75; b.add(fuego);
+    const fuegoMat = new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.9 });
+    for (let k = 0; k < 3; k++) {
+      const llama = pieza(new THREE.ConeGeometry(0.28 - k * 0.07, 0.8 - k * 0.15, 5), fuegoMat, (k - 1) * 0.12, 0.35, (k % 2) * 0.1, fuego);
+      llama.userData.fase = k * 2.1;
+    }
+    const luz = new THREE.PointLight(0xff8a3a, 22, 18, 1.6);
+    luz.position.y = 2.2; b.add(luz);
+    llamas.push({ fuego, luz, fase: x * z });
+    escena.add(b);
+  }
+})();
+
+// =====================================================================================
+//  Partículas (chispas, ceniza y polvo) con un solo sistema reutilizable
+// =====================================================================================
+const MAX_PARTICULAS = 900;
+const particulas = (() => {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(MAX_PARTICULAS * 3), col = new Float32Array(MAX_PARTICULAS * 3);
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  const puntos = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.12, vertexColors: true, transparent: true,
+    depthWrite: false, blending: THREE.AdditiveBlending }));
+  puntos.frustumCulled = false;
+  escena.add(puntos);
+  const vivas = [];                                   // { i, vx, vy, vz, vida, max, gravedad, color }
+  let siguiente = 0;
+  for (let i = 0; i < MAX_PARTICULAS; i++) pos[i * 3 + 1] = -100;
+  return {
+    emitir(origen, cantidad, color, rapidez = 3, opciones = {}) {
+      const c = new THREE.Color(color);
+      for (let n = 0; n < cantidad; n++) {
+        const i = siguiente; siguiente = (siguiente + 1) % MAX_PARTICULAS;
+        const a = Math.random() * Math.PI * 2, e = (opciones.subir ?? 0.6) + Math.random() * 0.8;
+        const r = opciones.radio ?? 0;
+        pos[i * 3] = origen.x + Math.cos(a) * r * Math.random();
+        pos[i * 3 + 1] = origen.y;
+        pos[i * 3 + 2] = origen.z + Math.sin(a) * r * Math.random();
+        vivas.push({ i, vx: Math.cos(a) * rapidez * Math.random(), vy: e * rapidez, vz: Math.sin(a) * rapidez * Math.random(),
+                     vida: 0, max: (opciones.vida ?? 0.8) * (0.6 + Math.random() * 0.6), gravedad: opciones.gravedad ?? 6, c });
+      }
+    },
+    actualizar(dt) {
+      for (let k = vivas.length - 1; k >= 0; k--) {
+        const p = vivas[k]; p.vida += dt;
+        const i = p.i, f = 1 - p.vida / p.max;
+        if (f <= 0) { pos[i * 3 + 1] = -100; vivas.splice(k, 1); continue; }
+        p.vy -= p.gravedad * dt;
+        pos[i * 3] += p.vx * dt; pos[i * 3 + 1] = Math.max(0.03, pos[i * 3 + 1] + p.vy * dt); pos[i * 3 + 2] += p.vz * dt;
+        col[i * 3] = p.c.r * f; col[i * 3 + 1] = p.c.g * f; col[i * 3 + 2] = p.c.b * f;
+      }
+      geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true;
+    },
+  };
+})();
+
+// Ondas de choque en el suelo cuando cae un golpe del jefe
+const ondas = [];
+function onda(x, z, radio, color = 0xff5a2a) {
+  const m = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 48),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.set(x, 0.05, z);
+  escena.add(m);
+  ondas.push({ m, t: 0, radio });
+}
+function actualizarOndas(dt) {
+  for (let k = ondas.length - 1; k >= 0; k--) {
+    const o = ondas[k]; o.t += dt;
+    const p = o.t / 0.45, s = o.radio * (0.3 + 0.9 * salida(Math.min(1, p)));
+    o.m.scale.set(s, s, s); o.m.material.opacity = 0.9 * (1 - p);
+    if (p >= 1) { escena.remove(o.m); o.m.geometry.dispose(); o.m.material.dispose(); ondas.splice(k, 1); }
+  }
+}
+
+// =====================================================================================
+//  El caballero (low-poly, generado por código)
+// =====================================================================================
+function crearCaballero(color) {
+  const raiz = new THREE.Group(), giro = new THREE.Group(), cuerpo = new THREE.Group();
+  giro.position.y = 0.6; cuerpo.position.y = -0.6;            // rueda alrededor de la cintura
+  raiz.add(giro); giro.add(cuerpo);
+  const acero = mat(0xaab0b8, { map: texMetal, shininess: 40, specular: 0x555555 });
+  const tinte = mat(color, { map: texTela });
+  const oscuro = mat(0x24202a);
+  const hoja = mat(0xd8dde4, { shininess: 90, specular: 0xaaaaaa, emissive: 0x111418 });
+  const mats = [acero, tinte, oscuro, hoja];
+
+  const piernaI = new THREE.Group(), piernaD = new THREE.Group();
+  piernaI.position.set(-0.13, 0.55, 0); piernaD.position.set(0.13, 0.55, 0);
+  for (const p of [piernaI, piernaD]) {
+    pieza(new THREE.BoxGeometry(0.17, 0.5, 0.2), acero, 0, -0.27, 0, p);
+    pieza(new THREE.BoxGeometry(0.19, 0.08, 0.28), oscuro, 0, -0.52, 0.04, p);
+    cuerpo.add(p);
+  }
+  pieza(new THREE.CylinderGeometry(0.31, 0.31, 0.09, 6), oscuro, 0, 0.6, 0, cuerpo);
+  pieza(new THREE.CylinderGeometry(0.25, 0.3, 0.55, 6), acero, 0, 0.88, 0, cuerpo);
+  pieza(new THREE.BoxGeometry(0.34, 0.55, 0.06), tinte, 0, 0.78, 0.27, cuerpo);
+  const cabeza = pieza(new THREE.CylinderGeometry(0.18, 0.21, 0.32, 6), acero, 0, 1.33, 0, cuerpo);
+  pieza(new THREE.BoxGeometry(0.28, 0.04, 0.06), mat(0x050505), 0, 0.02, 0.18, cabeza);
+  const penacho = pieza(new THREE.ConeGeometry(0.07, 0.4, 4), tinte, 0, 0.3, -0.06, cabeza);
+  penacho.rotation.x = -0.5;
+  for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.2, 0.13, 0.28), acero, s * 0.33, 1.12, 0, cuerpo);
+
+  const brazoD = new THREE.Group(); brazoD.position.set(0.37, 1.07, 0); cuerpo.add(brazoD);
+  pieza(new THREE.BoxGeometry(0.12, 0.42, 0.14), acero, 0, -0.2, 0, brazoD);
+  const espada = new THREE.Group(); espada.position.set(0, -0.42, 0.04); espada.rotation.x = Math.PI / 2; brazoD.add(espada);
+  pieza(new THREE.BoxGeometry(0.045, 0.16, 0.045), oscuro, 0, 0, 0, espada);
+  pieza(new THREE.BoxGeometry(0.28, 0.045, 0.07), acero, 0, 0.09, 0, espada);
+  pieza(new THREE.BoxGeometry(0.075, 0.95, 0.02), hoja, 0, 0.58, 0, espada);
+  pieza(new THREE.ConeGeometry(0.038, 0.12, 4), hoja, 0, 1.11, 0, espada);
+
+  const brazoI = new THREE.Group(); brazoI.position.set(-0.37, 1.07, 0); cuerpo.add(brazoI);
+  pieza(new THREE.BoxGeometry(0.12, 0.42, 0.14), acero, 0, -0.2, 0, brazoI);
+  const escudo = pieza(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 6), tinte, -0.05, -0.28, 0.16, brazoI);
+  escudo.rotation.x = Math.PI / 2;
+  pieza(new THREE.CylinderGeometry(0.33, 0.33, 0.04, 6), acero, 0, -0.02, 0, escudo);
+
+  const capa = new THREE.Group(); capa.position.set(0, 1.17, -0.27); cuerpo.add(capa);
+  const capaMat = mat(new THREE.Color(color).multiplyScalar(0.55).getHex(), { map: texTela, side: THREE.DoubleSide });
+  pieza(new THREE.PlaneGeometry(0.62, 0.95, 1, 3), capaMat, 0, -0.47, 0, capa);
+  mats.push(capaMat);
+
+  raiz.add(sombraRedonda(0.5));
+  return { raiz, giro, cuerpo, piernaI, piernaD, brazoD, brazoI, capa, mats, tipo: "caballero" };
+}
+
+// =====================================================================================
+//  Los jefes (diseños originales, low-poly, generados por código)
+// =====================================================================================
+function crearJefe(id) {
+  const raiz = new THREE.Group(), giro = new THREE.Group(); raiz.add(giro);
+  const arma = new THREE.Group();          // la pieza que se alza al preparar un ataque
+  const ojos = [], mats = [];
+  const m = (color, extra) => { const x = mat(color, extra); mats.push(x); return x; };
+  const brillo = (color) => { const x = new THREE.MeshBasicMaterial({ color }); ojos.push(x); return x; };
+  let reposo = -0.3, alzado = -3.3, golpe = -0.6;   // ángulos del arma (eje X)
+
+  if (id === "guardian") {                         // Guardián de Hierro: golem acorazado con martillo
+    const hierro = m(0x7a6250, { map: texMetal, shininess: 30 }), oscuro = m(0x2c2522);
+    for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.38, 0.85, 0.42), hierro, s * 0.35, 0.42, 0, giro);
+    pieza(new THREE.BoxGeometry(1.35, 1.0, 0.85), hierro, 0, 1.35, 0, giro);
+    pieza(new THREE.BoxGeometry(1.0, 0.6, 0.12), oscuro, 0, 1.4, 0.45, giro);
+    const cabeza = pieza(new THREE.BoxGeometry(0.48, 0.42, 0.48), hierro, 0, 2.06, 0.05, giro);
+    pieza(new THREE.BoxGeometry(0.36, 0.06, 0.05), brillo(0xff7a1a), 0, 0, 0.25, cabeza);
+    for (const s of [-1, 1]) {
+      const h = pieza(new THREE.BoxGeometry(0.6, 0.36, 0.75), hierro, s * 0.88, 1.8, 0, giro); h.rotation.z = s * -0.2;
+    }
+    pieza(new THREE.BoxGeometry(0.32, 0.95, 0.32), hierro, -0.88, 1.1, 0.05, giro);
+    arma.position.set(0.88, 1.65, 0);
+    pieza(new THREE.BoxGeometry(0.32, 0.85, 0.32), hierro, 0, -0.4, 0, arma);
+    const martillo = new THREE.Group(); martillo.position.set(0, -0.85, 0); martillo.rotation.x = Math.PI / 2; arma.add(martillo);
+    pieza(new THREE.CylinderGeometry(0.06, 0.06, 1.7, 6), oscuro, 0, 0.6, 0, martillo);
+    pieza(new THREE.BoxGeometry(0.7, 0.5, 0.5), hierro, 0, 1.45, 0, martillo);
+  } else if (id === "bruja") {                     // Bruja de Ceniza: túnica flotante y báculo ardiente
+    const ceniza = m(0x4d464c, { map: texTela }), oscuro = m(0x16121a);
+    pieza(new THREE.ConeGeometry(0.8, 1.9, 7), ceniza, 0, 0.95, 0, giro);
+    pieza(new THREE.CylinderGeometry(0.33, 0.55, 0.45, 7), ceniza, 0, 1.75, 0, giro);
+    const capucha = pieza(new THREE.ConeGeometry(0.34, 0.7, 6), ceniza, 0, 2.2, -0.04, giro);
+    pieza(new THREE.BoxGeometry(0.26, 0.26, 0.06), oscuro, 0, -0.18, 0.2, capucha);
+    for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.05, 0.03, 0.03), brillo(0xff9a3a), s * 0.06, -0.14, 0.24, capucha);
+    arma.position.set(0.5, 1.6, 0.1);
+    pieza(new THREE.ConeGeometry(0.12, 0.6, 5), ceniza, 0, -0.25, 0, arma);
+    pieza(new THREE.CylinderGeometry(0.03, 0.03, 2.3, 5), oscuro, 0, 0.0, 0.15, arma);
+    pieza(new THREE.IcosahedronGeometry(0.17, 0), brillo(0xff8a2a), 0, 1.15, 0.15, arma);
+    const luz = new THREE.PointLight(0xff7a2a, 6, 7, 1.6); luz.position.set(0, 1.15, 0.15); arma.add(luz);
+    reposo = 0; alzado = -1.4; golpe = 0.5;
+  } else if (id === "sabueso") {                   // Sabueso Abismal: bestia de cuatro patas
+    const piel = m(0x2b2238, { map: texTela }), hueso = m(0xb8ad98);
+    pieza(new THREE.BoxGeometry(0.85, 0.62, 1.6), piel, 0, 0.85, 0, giro);
+    for (let k = 0; k < 5; k++) { const p = pieza(new THREE.ConeGeometry(0.08, 0.35, 4), hueso, 0, 1.25, -0.6 + k * 0.3, giro); p.rotation.x = -0.4; }
+    for (const [x, z] of [[-0.3, 0.6], [0.3, 0.6], [-0.3, -0.6], [0.3, -0.6]]) pieza(new THREE.BoxGeometry(0.18, 0.7, 0.2), piel, x, 0.35, z, giro);
+    const cola = pieza(new THREE.ConeGeometry(0.08, 0.8, 4), piel, 0, 1.0, -1.1, giro); cola.rotation.x = -1.9;
+    arma.position.set(0, 1.05, 0.85);              // la cabeza hace de "arma"
+    const craneo = pieza(new THREE.ConeGeometry(0.32, 0.8, 5), hueso, 0, 0, 0.35, arma); craneo.rotation.x = Math.PI / 2;
+    for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.07, 0.05, 0.05), brillo(0xa66bff), s * 0.13, 0.1, 0.35, arma);
+    for (const s of [-1, 1]) { const c = pieza(new THREE.ConeGeometry(0.05, 0.4, 4), hueso, s * 0.2, 0.25, 0.05, arma); c.rotation.x = -0.6; }
+    reposo = 0; alzado = -0.5; golpe = 0.35;
+  } else if (id === "rey") {                       // Rey sin Corona: espadón y corona rota
+    const oro = m(0x7f6a38, { map: texMetal, shininess: 50 }), palido = m(0xb6ab9b), capaM = m(0x4a0f14, { map: texTela, side: THREE.DoubleSide });
+    for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.22, 1.15, 0.26), oro, s * 0.2, 0.58, 0, giro);
+    pieza(new THREE.CylinderGeometry(0.38, 0.27, 0.95, 6), oro, 0, 1.6, 0, giro);
+    pieza(new THREE.PlaneGeometry(0.9, 1.9, 1, 3), capaM, 0, 1.2, -0.32, giro);
+    const cabeza = pieza(new THREE.CylinderGeometry(0.17, 0.2, 0.36, 6), palido, 0, 2.3, 0, giro);
+    for (let k = 0; k < 7; k++) {                  // corona incompleta: faltan dos puntas
+      if (k === 2 || k === 5) continue;
+      const a = (k / 7) * Math.PI * 2, p = pieza(new THREE.ConeGeometry(0.04, 0.2, 4), oro, Math.sin(a) * 0.19, 0.25, Math.cos(a) * 0.19, cabeza);
+      p.rotation.z = k === 4 ? 0.5 : 0;
+    }
+    for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.26, 0.15, 0.32), oro, s * 0.45, 2.05, 0, giro);
+    pieza(new THREE.BoxGeometry(0.13, 0.8, 0.15), oro, -0.45, 1.6, 0, giro);
+    arma.position.set(0.47, 1.95, 0);
+    pieza(new THREE.BoxGeometry(0.13, 0.75, 0.15), oro, 0, -0.35, 0, arma);
+    const espadon = new THREE.Group(); espadon.position.set(0, -0.72, 0.05); espadon.rotation.x = Math.PI / 2; arma.add(espadon);
+    pieza(new THREE.BoxGeometry(0.4, 0.06, 0.1), oro, 0, 0.1, 0, espadon);
+    pieza(new THREE.BoxGeometry(0.14, 1.9, 0.04), m(0xc9ccd2, { shininess: 90, specular: 0x999999 }), 0, 1.1, 0, espadon);
+    pieza(new THREE.BoxGeometry(0.03, 1.7, 0.05), brillo(0x8a1a1a), 0, 1.05, 0, espadon);
+  } else {                                         // Coloso del Eclipse (jefe del día)
+    const roca = m(0x5d5960, { map: texturaLadrillo(1) }), negro = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.5, 1.0, 0.55), roca, s * 0.45, 0.5, 0, giro);
+    pieza(new THREE.BoxGeometry(1.6, 1.3, 1.0), roca, 0, 1.65, 0, giro);
+    const cabeza = pieza(new THREE.DodecahedronGeometry(0.38, 0), roca, 0, 2.6, 0.05, giro);
+    pieza(new THREE.BoxGeometry(0.4, 0.06, 0.05), brillo(0xff3a2a), 0, 0.02, 0.35, cabeza);
+    const halo = pieza(new THREE.TorusGeometry(0.95, 0.07, 6, 28), brillo(0xff6a2a), 0, 2.75, -0.55, giro);
+    pieza(new THREE.CircleGeometry(0.88, 28), negro, 0, 0, -0.02, halo);
+    pieza(new THREE.BoxGeometry(0.45, 1.1, 0.45), roca, -1.05, 1.5, 0, giro);
+    arma.position.set(1.05, 2.1, 0);
+    pieza(new THREE.BoxGeometry(0.45, 1.0, 0.45), roca, 0, -0.5, 0, arma);
+    pieza(new THREE.DodecahedronGeometry(0.42, 0), roca, 0, -1.15, 0, arma);
+    reposo = -0.2; alzado = -2.9; golpe = -0.9;
+  }
+  giro.add(arma);
+  raiz.add(sombraRedonda(1));
+  arma.rotation.x = reposo;
+  return { raiz, giro, arma, ojos, mats, reposo, alzado, golpe, tipo: id };
+}
+
+// =====================================================================================
+//  Estado de red (igual que el cliente 2D) y entidades en la escena
+// =====================================================================================
+let ws = null, miId = null, miRol = "jugador";
+let previo = null, actual = null, tActual = 0, rtt = null, fin = null, elegida = false;
+let avisoVisto = null, avisoAnterior = null;
+const caballeros = new Map();            // id → { modelo, estadoPrevio, tEstado, ... }
+let jefeVista = null;                    // { clave, modelo, ... }
+const jefesMuriendo = [];
+let sacudida = 0;
+
+function ponerEstado(t) { $("estadoConexion").textContent = t; }
+function enviar(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+setInterval(() => enviar({ ping: performance.now() }), 1000);
+
+function conectar() {
+  if (ws) { const viejo = ws; viejo.onclose = viejo.onmessage = null; viejo.close(); }
+  document.activeElement && document.activeElement.blur();
+  iniciarAudio();
+  miRol = $("rol").value;
+  miId = $("nombre").value.trim() || "caballero" + Math.floor(Math.random() * 1000);
+  $("nombre").value = miId;
+  previo = actual = null; fin = null; elegida = false; avisoVisto = null;
+  limpiarEntidades();
+  ponerEstado("conectando…");
+  try { ws = new WebSocket($("url").value.trim()); } catch (e) { ponerEstado("URL inválida"); return; }
+  const este = ws;
+  ws.onopen = () => este.send(JSON.stringify({ hola: { id: miId, rol: miRol } }));
+  ws.onmessage = (m) => {
+    const d = JSON.parse(m.data);
+    if ("pong" in d) { rtt = performance.now() - d.pong; return; }
+    if (d.bienvenida) { mostrarJuego(); return; }
+    if ("estado" in d) recibir(d);
+  };
+  ws.onclose = (e) => {
+    if (ws !== este) return;
+    ws = null;
+    if (!fin) {
+      ocultarJuego();
+      ponerEstado(`Sin conexión (${e.code}${e.reason ? ": " + e.reason : ""})`);
+    }
+  };
+}
+$("botonEntrar").addEventListener("click", conectar);
+$("nombre").addEventListener("keydown", (e) => { if (e.key === "Enter") conectar(); });
+
+function mostrarJuego() {
+  $("inicio").classList.add("oculto");
+  for (const id of ["hud", "info", "ayuda"]) $(id).classList.toggle("oculto", id === "hud" && miRol !== "jugador");
+}
+function ocultarJuego() {
+  for (const id of ["hud", "hudJefe", "info", "ayuda", "capa"]) $(id).classList.add("oculto");
+  $("inicio").classList.remove("oculto");
+  limpiarEntidades();
+  actual = previo = null;
+}
+function limpiarEntidades() {
+  for (const c of caballeros.values()) escena.remove(c.modelo.raiz);
+  caballeros.clear();
+  if (jefeVista) escena.remove(jefeVista.modelo.raiz);
+  jefeVista = null;
+}
+
+// =====================================================================================
+//  Snapshots y eventos
+// =====================================================================================
+function recibir(snap) {
+  previo = actual; actual = snap; tActual = performance.now();
+  // Caballeros que entran y salen
+  const ids = Object.keys(snap.jugadores).sort();
+  ids.forEach((id, i) => {
+    if (!caballeros.has(id)) {
+      const modelo = crearCaballero(COLORES_JUGADOR[i % COLORES_JUGADOR.length]);
+      escena.add(modelo.raiz);
+      caballeros.set(id, { modelo, estado: "libre", tEstado: 0, giro: 0, fase: 0, flash: 0, x: 0, y: 0 });
+    }
+  });
+  for (const [id, c] of caballeros) if (!snap.jugadores[id]) { escena.remove(c.modelo.raiz); caballeros.delete(id); }
+  // Cambio de estado de cada caballero (para empezar animaciones)
+  for (const [id, j] of Object.entries(snap.jugadores)) {
+    const c = caballeros.get(id);
+    if (j.estado !== c.estado) {
+      if (j.estado === "esquivando") { sonido("esquiva"); particulas.emitir(mundo(j.x, j.y, 0.1), 10, 0x6a6058, 1.2, { gravedad: 2, vida: 0.6 }); }
+      if (j.estado === "muerto") sonido("muerte");
+      c.estado = j.estado; c.tEstado = performance.now();
+    }
+  }
+  // El jefe: si cambia de piso, el anterior se desvanece y aparece el nuevo
+  if (snap.jefe) {
+    const clave = `${snap.piso}-${snap.jefe.id}`;
+    if (!jefeVista || jefeVista.clave !== clave) {
+      if (jefeVista) jefesMuriendo.push({ ...jefeVista, t: 0 });
+      const modelo = crearJefe(snap.jefe.id);
+      modelo.raiz.scale.setScalar(snap.jefe.radio);
+      escena.add(modelo.raiz);
+      jefeVista = { clave, modelo, estado: snap.jefe.estado, tEstado: performance.now(), giro: 0, flash: 0, aparicion: 0, x: snap.jefe.x, y: snap.jefe.y };
+    }
+    const jv = jefeVista;
+    if (snap.jefe.estado !== jv.estado) {
+      if (jv.estado === "preparando" && avisoAnterior) impactoVisual(avisoAnterior);
+      jv.estado = snap.jefe.estado; jv.tEstado = performance.now();
+    }
+    // Embestida: si el jefe salta lejos de un snapshot al otro, deja polvo en el camino
+    if (previo && previo.jefe && Math.hypot(snap.jefe.x - previo.jefe.x, snap.jefe.y - previo.jefe.y) > 1.5) {
+      for (let k = 0; k <= 6; k++) {
+        const x = lerp(previo.jefe.x, snap.jefe.x, k / 6), y = lerp(previo.jefe.y, snap.jefe.y, k / 6);
+        particulas.emitir(mundo(x, y, 0.1), 6, 0x7a6a5a, 1.5, { gravedad: 1.5, vida: 0.9 });
+      }
+    }
+  }
+  // Aviso del jefe
+  const aviso = snap.jefe && snap.jefe.aviso;
+  if (aviso) {
+    const clave = aviso.ataque + JSON.stringify(aviso.zonas);
+    if (!avisoVisto || avisoVisto.clave !== clave) { avisoVisto = { clave, total: Math.max(aviso.en, 0.05), meteoros: false }; sonido("aviso"); }
+    avisoAnterior = { ...aviso, tipo: aviso.ataque };
+  } else avisoVisto = null;
+
+  if (snap.estado !== "mejora") elegida = false;
+  for (const e of snap.eventos) evento(e, snap);
+  actualizarHud(snap);
+  actualizarCapa(snap);
+}
+
+function impactoVisual(aviso) {
+  for (const [zx, zy] of aviso.zonas) {
+    const p = mundo(zx, zy);
+    onda(p.x, p.z, aviso.radio);
+    particulas.emitir(new THREE.Vector3(p.x, 0.1, p.z), 35, 0xff7a2a, 4, { radio: aviso.radio * 0.6, vida: 0.7 });
+  }
+  const yo = actual && actual.jugadores[miId];
+  const cerca = yo && aviso.zonas.some(([zx, zy]) => Math.hypot(zx - yo.x, zy - yo.y) < aviso.radio + 3);
+  sacudida = Math.max(sacudida, cerca ? 0.35 : 0.12);
+  sonido("impacto");
+}
+
+function evento(e, snap) {
+  let texto = null;
+  if (e.tipo === "golpe" && jefeVista) {
+    jefeVista.flash = 1;
+    numero(`${Math.round(e.dano)}`, mundo(snap.jefe.x, snap.jefe.y, 2.4 * snap.jefe.radio), "#f1e3c0");
+    particulas.emitir(mundo(snap.jefe.x, snap.jefe.y, 1.4), 14, 0xfff0c0, 3, { vida: 0.4 });
+    if (e.jugador === miId) { sonido("golpe"); sacudida = Math.max(sacudida, 0.06); }
+  } else if (e.tipo === "impacto") {
+    const j = snap.jugadores[e.jugador], c = caballeros.get(e.jugador);
+    if (j && e.dano > 0) {
+      if (c) c.flash = 1;
+      numero(`-${Math.round(e.dano)}`, mundo(j.x, j.y, 2.0), "#ff5a4a");
+      texto = `${e.ataque} alcanza a ${e.jugador}`;
+    } else if (j) {
+      numero("esquiva", mundo(j.x, j.y, 2.0), "#9fd0ff");
+    }
+  } else if (e.tipo === "piso") {
+    banner(e.jefe, `Piso ${e.piso} de ${snap.pisos}`, 3200);
+    sonido("piso");
+  } else if (e.tipo === "jefe_vencido") {
+    banner("Enemigo derrotado", "", 2600);
+    sonido("victoria");
+    if (jefeVista) particulas.emitir(mundo(snap.jefe.x, snap.jefe.y, 1), 120, 0xd8b46a, 5, { radio: 1, vida: 1.6, gravedad: 2 });
+  } else if (e.tipo === "entra") texto = `${e.jugador} entra a la torre`;
+  else if (e.tipo === "sale") texto = `${e.jugador} abandona la torre`;
+  else if (e.tipo === "fin") fin = e;
+  if (texto) aviso(texto);
+}
+
+function aviso(texto) {
+  const d = document.createElement("div"); d.textContent = texto;
+  $("eventos").prepend(d);
+  while ($("eventos").children.length > 6) $("eventos").lastChild.remove();
+}
+let bannerTimer = 0;
+function banner(grande, chico, ms, color = "var(--oro)") {
+  $("bannerGrande").textContent = grande; $("bannerGrande").style.color = color;
+  $("bannerChico").textContent = chico;
+  $("banner").classList.add("visible");
+  clearTimeout(bannerTimer);
+  if (ms) bannerTimer = setTimeout(() => $("banner").classList.remove("visible"), ms);
+}
+
+// Números de daño que flotan sobre la escena
+const numeros = [];
+function numero(texto, pos, color) {
+  const el = document.createElement("div");
+  el.className = "numero"; el.textContent = texto; el.style.color = color;
+  $("numeros").appendChild(el);
+  // se reparten al azar y se apilan para que golpes seguidos no se encimen
+  const recientes = numeros.filter((n) => n.t < 0.3 && n.pos.distanceTo(pos) < 1.5).length;
+  const desvio = new THREE.Vector3((Math.random() - 0.5) * 1.6, recientes * 0.45 + Math.random() * 0.3, (Math.random() - 0.5) * 0.6);
+  numeros.push({ el, pos: pos.clone().add(desvio), t: 0 });
+}
+function actualizarNumeros(dt) {
+  const v = new THREE.Vector3();
+  for (let k = numeros.length - 1; k >= 0; k--) {
+    const n = numeros[k]; n.t += dt; n.pos.y += dt * 1.2;
+    v.copy(n.pos).project(camara);
+    n.el.style.left = `${(v.x * 0.5 + 0.5) * innerWidth}px`;
+    n.el.style.top = `${(-v.y * 0.5 + 0.5) * innerHeight}px`;
+    n.el.style.opacity = String(1 - n.t / 1.1);
+    if (n.t > 1.1 || v.z > 1) { n.el.remove(); numeros.splice(k, 1); }
+  }
+}
+
+// =====================================================================================
+//  HUD y capas (sala de espera, mejoras, fin)
+// =====================================================================================
+function ancho(id, valor, maximo) { $(id).style.width = `${limitar(100 * valor / maximo, 0, 100)}%`; }
+function actualizarHud(s) {
+  const yo = s.jugadores[miId];
+  if (yo) {
+    $("miNombre").textContent = miId;
+    ancho("barraVida", yo.vida, yo.vida_max); ancho("ecoVida", yo.vida, yo.vida_max);
+    ancho("barraStamina", yo.st, yo.st_max);
+    $("barraVida").parentElement.style.width = `${limitar(yo.vida_max / 100, 1, 2) * 100}%`;
+  }
+  $("aliados").innerHTML = Object.entries(s.jugadores).filter(([id]) => id !== miId).map(([id, j]) =>
+    `${esc(id)}${j.estado === "muerto" ? " (caído)" : ""}<div class="barra"><div style="width:${limitar(100 * j.vida / j.vida_max, 0, 100)}%;background:var(--vida)"></div></div>`).join("");
+  const enCombate = s.jefe && (s.estado === "combate" || s.estado === "mejora") && s.jefe.estado !== "muerto";
+  $("hudJefe").classList.toggle("oculto", !enCombate);
+  if (s.jefe) {
+    $("nombreJefe").textContent = s.jefe.nombre;
+    $("fasesJefe").textContent = s.jefe.fases > 1 ? `fase ${s.jefe.fase} de ${s.jefe.fases}` : "";
+    ancho("barraJefe", s.jefe.vida, s.jefe.vida_max); ancho("ecoJefe", s.jefe.vida, s.jefe.vida_max);
+  }
+  $("piso").textContent = s.estado === "esperando" ? "Sala de espera" : `Piso ${s.piso} de ${s.pisos}`;
+  $("detalle").textContent = `${s.t.toFixed(1)} s · ${rtt === null ? "—" : rtt.toFixed(0) + " ms"}${miRol === "espectador" ? " · espectador" : ""}`;
+}
+
+function mostrarCapa(html) { $("capa").innerHTML = html; $("capa").classList.remove("oculto"); }
+function ocultarCapa() { $("capa").classList.add("oculto"); }
+let finMostrado = false;
+function actualizarCapa(s) {
+  if (fin) {
+    if (!finMostrado) {
+      finMostrado = true;
+      const gano = fin.resultado === "victoria";
+      if (gano) banner("La torre ha caído", `Tiempo de combate: ${s.t.toFixed(1)} s`, 0);
+      else banner("Has caído", esc(fin.motivo), 0, "#b3261e");
+      sonido(gano ? "victoria" : "muerte");
+      setTimeout(() => mostrarCapa(`<div style="margin-top:220px"><button id="otraRun">Subir de nuevo</button></div>`), 1800);
+      setTimeout(() => { const b = $("otraRun"); if (b) b.onclick = () => { finMostrado = false; $("banner").classList.remove("visible"); ocultarCapa(); conectar(); }; }, 1850);
+    }
+    return;
+  }
+  finMostrado = false;
+  if (s.estado === "esperando") {
+    const listo = miRol === "jugador" ? "Pulsa <kbd>Enter</kbd> cuando estés listo" : "Esperando a los jugadores…";
+    return mostrarCapa(`<h2 class="titulo">La torre aguarda</h2><p>${listo}<br><span style="color:var(--tenue)">La subida empieza sola en ${s.inicio_en.toFixed(0)} s</span></p>`);
+  }
+  if (s.estado === "mejora" && miRol === "jugador") {
+    const ofertas = (s.ofertas || {})[miId] || [];
+    if (elegida) return mostrarCapa(`<h2 class="titulo">Bendición aceptada</h2><p style="color:var(--tenue)">Esperando a los demás… ${s.elegir_en.toFixed(0)} s</p>`);
+    const cartas = ofertas.map((o, i) => `<div class="carta" data-i="${i}"><b>${esc(o.nombre)}</b><small>${esc(o.descripcion)}</small><span class="tecla">tecla ${i + 1}</span></div>`).join("");
+    mostrarCapa(`<h2 class="titulo">Elige una bendición</h2><div class="cartas">${cartas}</div><p style="color:var(--tenue)">${s.elegir_en.toFixed(0)} s</p>`);
+    for (const el of document.querySelectorAll(".carta")) el.onclick = () => elegir(Number(el.dataset.i));
+    return;
+  }
+  if (s.estado === "mejora") return mostrarCapa(`<h2 class="titulo">Los caballeros eligen su bendición…</h2>`);
+  ocultarCapa();
+}
+
+// =====================================================================================
+//  Controles: movimiento relativo a la cámara con el jefe fijado (estilo Souls)
+// =====================================================================================
+const teclas = new Set();
+let ultimoMovimiento = { dx: 0, dy: 0, t: 0 };
+function ejes() {
+  const adelante = (teclas.has("w") || teclas.has("arrowup") ? 1 : 0) - (teclas.has("s") || teclas.has("arrowdown") ? 1 : 0);
+  const derecha = (teclas.has("d") || teclas.has("arrowright") ? 1 : 0) - (teclas.has("a") || teclas.has("arrowleft") ? 1 : 0);
+  return [adelante, derecha];
+}
+function haciaElJefe() {                     // vector (servidor) del caballero al jefe
+  const yo = actual && actual.jugadores[miId];
+  if (!yo || !actual.jefe || actual.jefe.estado === "muerto") return [0, 1];
+  const dx = actual.jefe.x - yo.x, dy = actual.jefe.y - yo.y, d = Math.hypot(dx, dy) || 1;
+  return [dx / d, dy / d];
+}
+function direccionDeseada() {
+  const [adelante, derecha] = ejes();
+  const [fx, fy] = haciaElJefe(), rx = fy, ry = -fx;       // derecha = adelante girado 90°
+  return [fx * adelante + rx * derecha, fy * adelante + ry * derecha];
+}
+function actualizarMovimiento(ahora) {
+  if (miRol !== "jugador" || !actual) return;
+  const [dx, dy] = direccionDeseada();
+  const parado = Math.abs(dx) + Math.abs(dy) < 1e-6;
+  const u = ultimoMovimiento, angulo = Math.abs(Math.atan2(dy, dx) - Math.atan2(u.dy, u.dx));
+  const cambio = parado !== (Math.abs(u.dx) + Math.abs(u.dy) < 1e-6) || (!parado && (angulo > 0.05 || ahora - u.t > 200));
+  if (cambio) { enviar({ accion: "mover", dx, dy }); ultimoMovimiento = { dx, dy, t: ahora }; }
+}
+function atacar() {
+  const yo = actual && actual.jugadores[miId];
+  if (!yo || !actual.jefe) return;
+  enviar({ accion: "atacar", dx: actual.jefe.x - yo.x, dy: actual.jefe.y - yo.y });
+}
+function esquivar() {
+  const [dx, dy] = direccionDeseada();
+  if (Math.abs(dx) + Math.abs(dy) < 1e-6) { const [fx, fy] = haciaElJefe(); enviar({ accion: "esquivar", dx: -fx, dy: -fy }); }
+  else enviar({ accion: "esquivar", dx, dy });
+}
+function elegir(i) {
+  const ofertas = actual && (actual.ofertas || {})[miId];
+  if (!ofertas || !ofertas[i] || elegida) return;
+  enviar({ accion: "elegir_mejora", id: ofertas[i].id });
+  elegida = true; sonido("mejora");
+  actualizarCapa(actual);
+}
+addEventListener("keydown", (e) => {
+  if (["INPUT", "SELECT"].includes(e.target.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === "p") { modoPixelado = !modoPixelado; lienzo.classList.toggle("pixelado", modoPixelado); ajustarTamano(); return; }
+  if (k === "m") { silencio = !silencio; return; }
+  if (miRol !== "jugador") return;
+  if (k === "enter" || k === " ") e.preventDefault();
+  if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) { teclas.add(k); e.preventDefault(); }
+  else if (k === "j" && !e.repeat) atacar();
+  else if ((k === " " || k === "k" || k === "shift") && !e.repeat) esquivar();
+  else if (k === "enter") enviar({ accion: "listo" });
+  else if (["1", "2", "3"].includes(k)) elegir(Number(k) - 1);
+});
+addEventListener("keyup", (e) => teclas.delete(e.key.toLowerCase()));
+addEventListener("blur", () => teclas.clear());
+lienzo.addEventListener("mousedown", (e) => { if (miRol === "jugador" && e.button === 0) atacar(); if (e.button === 2) esquivar(); });
+lienzo.addEventListener("contextmenu", (e) => e.preventDefault());
+
+// =====================================================================================
+//  Sonido sintetizado con WebAudio (sin archivos de audio)
+// =====================================================================================
+let audio = null, silencio = false, bufferRuido = null;
+function iniciarAudio() {
+  if (audio) return;
+  try {
+    audio = new (window.AudioContext || window.webkitAudioContext)();
+    bufferRuido = audio.createBuffer(1, audio.sampleRate, audio.sampleRate);
+    const d = bufferRuido.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  } catch (e) { audio = null; }
+}
+function tono(frec, frecFin, dur, tipo = "sine", vol = 0.2, retraso = 0) {
+  const t = audio.currentTime + retraso, o = audio.createOscillator(), g = audio.createGain();
+  o.type = tipo; o.frequency.setValueAtTime(frec, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, frecFin), t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g).connect(audio.destination); o.start(t); o.stop(t + dur);
+}
+function soplo(dur, frec, vol = 0.25, q = 1) {
+  const t = audio.currentTime, s = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+  s.buffer = bufferRuido; f.type = "bandpass"; f.frequency.setValueAtTime(frec, t); f.Q.value = q;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  s.connect(f).connect(g).connect(audio.destination); s.start(t); s.stop(t + dur);
+}
+function sonido(tipo) {
+  if (!audio || silencio) return;
+  if (tipo === "golpe") { soplo(0.09, 2200, 0.35, 2); tono(180, 90, 0.1, "square", 0.08); }
+  else if (tipo === "impacto") { tono(90, 35, 0.45, "sine", 0.5); soplo(0.3, 300, 0.35); }
+  else if (tipo === "esquiva") soplo(0.18, 900, 0.18, 0.7);
+  else if (tipo === "aviso") tono(220, 180, 0.15, "triangle", 0.05);
+  else if (tipo === "mejora") { tono(523, 523, 0.25, "sine", 0.12); tono(784, 784, 0.4, "sine", 0.1, 0.12); }
+  else if (tipo === "piso") { tono(110, 105, 1.2, "sawtooth", 0.06); tono(165, 160, 1.2, "sine", 0.08); }
+  else if (tipo === "victoria") { tono(392, 392, 0.3, "triangle", 0.12); tono(523, 523, 0.3, "triangle", 0.12, 0.15); tono(659, 659, 0.6, "triangle", 0.12, 0.3); }
+  else if (tipo === "muerte") tono(260, 55, 1.4, "sawtooth", 0.1);
+}
+
+// =====================================================================================
+//  Animación de cada cuadro
+// =====================================================================================
+function interp(a, b, alfa, campo) { return a ? lerp(a[campo], b[campo], alfa) : b[campo]; }
+
+function animarCaballero(c, j, jp, alfa, ahora, dt) {
+  const m = c.modelo;
+  const x = interp(jp, j, alfa, "x"), y = interp(jp, j, alfa, "y");
+  const velocidad = Math.hypot(x - c.x, y - c.y) / Math.max(dt, 1e-3);
+  c.x = x; c.y = y;
+  m.raiz.position.copy(mundo(x, y));
+  c.giro = lerpAngulo(c.giro, giroHacia(j.dx, j.dy), 1 - Math.exp(-dt * 14));
+  m.raiz.rotation.y = c.giro;
+  const t = (ahora - c.tEstado) / 1000;
+  // valores de reposo
+  m.giro.rotation.set(0, 0, 0); m.giro.position.y = 0.6;
+  m.brazoD.rotation.set(-0.35, 0, 0); m.brazoI.rotation.set(0, 0, 0);
+  const paso = limitar(velocidad / 5, 0, 1);
+  c.fase += dt * (4 + 8 * paso);
+  m.piernaI.rotation.x = Math.sin(c.fase) * 0.7 * paso;
+  m.piernaD.rotation.x = -Math.sin(c.fase) * 0.7 * paso;
+  m.brazoI.rotation.x = -Math.sin(c.fase) * 0.4 * paso;
+  m.giro.position.y = 0.6 + Math.abs(Math.sin(c.fase)) * 0.05 * paso + Math.sin(ahora / 500) * 0.01;
+  m.capa.rotation.x = 0.15 + paso * 0.5 + Math.sin(ahora / 300) * 0.05;
+
+  if (j.estado === "atacando") {                 // preparación 0.30 s, tajo, recuperación hasta 0.55 s
+    let a;
+    if (t < 0.28) a = lerp(-0.35, -3.6, salida(t / 0.28));
+    else if (t < 0.36) a = lerp(-3.6, -0.6, (t - 0.28) / 0.08);
+    else a = lerp(-0.6, -0.35, limitar((t - 0.36) / 0.2, 0, 1));
+    m.brazoD.rotation.x = a;
+    m.giro.rotation.y = t < 0.28 ? -0.35 * salida(t / 0.28) : lerp(-0.35, 0.3, limitar((t - 0.28) / 0.1, 0, 1));
+  } else if (j.estado === "esquivando") {        // voltereta
+    const p = limitar(t / 0.4, 0, 1);
+    m.giro.rotation.x = p * Math.PI * 2;
+    m.giro.position.y = 0.6 - Math.sin(p * Math.PI) * 0.3;
+  } else if (j.estado === "muerto") {
+    const p = suave(limitar(t / 0.7, 0, 1));
+    m.giro.rotation.x = -p * Math.PI / 2 * 0.95;
+    m.giro.position.y = 0.6 - p * 0.42;
+  }
+  // destello rojo al recibir daño
+  c.flash = Math.max(0, c.flash - dt * 5);
+  for (const mt of m.mats) mt.emissive.setRGB(c.flash * 0.7, 0, 0);
+}
+
+function animarJefe(jv, jb, ja, alfa, ahora, dt) {
+  const m = jv.modelo, r = jb.radio;
+  const x = interp(ja, jb, alfa, "x"), y = interp(ja, jb, alfa, "y");
+  const velocidad = Math.hypot(x - jv.x, y - jv.y) / Math.max(dt, 1e-3);
+  jv.x = x; jv.y = y;
+  jv.aparicion = Math.min(1, jv.aparicion + dt / 1.2);
+  m.raiz.position.copy(mundo(x, y, (salida(jv.aparicion) - 1) * 2.5 * r));     // surge del suelo
+  // mira hacia donde va a golpear, o hacia el caballero más cercano
+  let objetivo = null;
+  if (jb.aviso && jb.aviso.zonas.length) {
+    const [zx, zy] = jb.aviso.zonas[0];
+    if (Math.hypot(zx - jb.x, zy - jb.y) > 0.3) objetivo = [zx - jb.x, zy - jb.y];
+  }
+  if (!objetivo && actual) {
+    let mejor = Infinity;
+    for (const j of Object.values(actual.jugadores)) {
+      const d = Math.hypot(j.x - jb.x, j.y - jb.y);
+      if (j.estado !== "muerto" && d < mejor) { mejor = d; objetivo = [j.x - jb.x, j.y - jb.y]; }
+    }
+  }
+  if (objetivo && jb.estado !== "recuperando") jv.giro = lerpAngulo(jv.giro, giroHacia(objetivo[0], objetivo[1]), 1 - Math.exp(-dt * 5));
+  m.raiz.rotation.y = jv.giro;
+
+  const t = (ahora - jv.tEstado) / 1000, paso = limitar(velocidad / 3, 0, 1);
+  m.giro.position.y = Math.abs(Math.sin(ahora / 180)) * 0.08 * paso + (m.tipo === "bruja" ? 0.25 + Math.sin(ahora / 400) * 0.1 : 0);
+  m.giro.rotation.set(0, 0, 0);
+  m.giro.scale.set(1, 1 + Math.sin(ahora / 450) * 0.02, 1);
+  let brilloOjos = 1;
+  if (jb.estado === "preparando" && jb.aviso && avisoVisto) {
+    const p = 1 - limitar(jb.aviso.en / avisoVisto.total, 0, 1);
+    m.arma.rotation.x = lerp(m.reposo, m.alzado, salida(p));
+    m.giro.rotation.x = m.tipo === "sabueso" ? 0.25 * p : -0.18 * p;
+    if (m.tipo === "sabueso") m.giro.position.y -= 0.2 * p;
+    brilloOjos = 1 + 3 * p;
+    for (const mt of m.mats) mt.emissive.setRGB(0.35 * p, 0.05 * p, 0);
+    // la lluvia de ceniza: meteoros que caen justo antes del impacto
+    if (jb.aviso.ataque.includes("lluvia") && jb.aviso.en < 0.5 && !avisoVisto.meteoros) {
+      avisoVisto.meteoros = true;
+      for (const [zx, zy] of jb.aviso.zonas) particulas.emitir(mundo(zx, zy, 7), 30, 0xff8a2a, 0.6, { radio: 0.6, gravedad: 30, subir: -1, vida: 0.7 });
+    }
+  } else if (jb.estado === "recuperando") {        // tras el golpe: ventana para castigarlo
+    m.arma.rotation.x = lerp(m.golpe, m.reposo, limitar(t / 0.9, 0, 1));
+    m.giro.rotation.x = 0.15 * (1 - limitar(t / 0.9, 0, 1));
+    for (const mt of m.mats) mt.emissive.setRGB(0, 0, 0);
+  } else if (jb.estado === "muerto") {
+    m.giro.rotation.x = 0;
+  } else {
+    m.arma.rotation.x = lerp(m.arma.rotation.x, m.reposo + Math.sin(ahora / 600) * 0.05, 1 - Math.exp(-dt * 6));
+    for (const mt of m.mats) mt.emissive.setRGB(0, 0, 0);
+  }
+  jv.flash = Math.max(0, jv.flash - dt * 8);
+  if (jv.flash > 0) for (const mt of m.mats) mt.emissive.setRGB(jv.flash * 0.8, jv.flash * 0.8, jv.flash * 0.75);
+  for (const o of m.ojos) { if (!o.userData.base) o.userData.base = o.color.clone(); o.color.copy(o.userData.base).multiplyScalar(brilloOjos); }
+}
+
+function animarMuertes(dt) {
+  for (let k = jefesMuriendo.length - 1; k >= 0; k--) {
+    const j = jefesMuriendo[k]; j.t += dt;
+    const p = limitar(j.t / 2.2, 0, 1), m = j.modelo;
+    m.giro.rotation.x = suave(p) * 0.5;
+    m.raiz.position.y = -suave(p) * 3;
+    if (Math.random() < 0.6) particulas.emitir(m.raiz.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 3, 0xd8b46a, 1.5, { radio: 1, gravedad: -1, vida: 1.2 });
+    if (p >= 1) { escena.remove(m.raiz); jefesMuriendo.splice(k, 1); }
+  }
+}
+
+// Avisos del jefe dibujados en el suelo: un anillo y un disco que se llena
+const marcas = [];
+function marca(i) {
+  while (marcas.length <= i) {
+    const g = new THREE.Group();
+    const anillo = new THREE.Mesh(new THREE.RingGeometry(0.94, 1, 48), new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0.9, depthWrite: false }));
+    const disco = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0.3, depthWrite: false }));
+    const fondo = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0.12, depthWrite: false }));
+    for (const x of [anillo, disco, fondo]) { x.rotation.x = -Math.PI / 2; g.add(x); }
+    anillo.position.y = 0.04; disco.position.y = 0.035; fondo.position.y = 0.03;
+    g.userData = { anillo, disco, fondo };
+    escena.add(g); marcas.push(g);
+  }
+  return marcas[i];
+}
+function dibujarAvisos(ahora) {
+  const a = actual && actual.jefe && actual.jefe.aviso;
+  const zonas = a && avisoVisto ? a.zonas : [];
+  zonas.forEach(([zx, zy], i) => {
+    const g = marca(i), p = 1 - limitar(a.en / avisoVisto.total, 0, 1);
+    g.visible = true; g.position.copy(mundo(zx, zy));
+    g.scale.setScalar(a.radio);
+    g.userData.disco.scale.setScalar(Math.max(0.01, p));
+    g.userData.anillo.material.opacity = 0.6 + 0.4 * Math.abs(Math.sin(ahora / (p > 0.7 ? 50 : 120)));
+  });
+  for (let i = zonas.length; i < marcas.length; i++) marcas[i].visible = false;
+}
+
+// Cámara: detrás del caballero mirando al jefe; los espectadores giran alrededor de la arena
+const objetivoCamara = new THREE.Vector3(), miradaCamara = new THREE.Vector3(0, 1, 0);
+function actualizarCamara(dt, ahora) {
+  const yo = actual && caballeros.get(miId), jefe = jefeVista && actual && actual.jefe;
+  let destino, mirar;
+  if (miRol === "jugador" && yo) {
+    const pk = mundo(yo.x, yo.y);
+    const pj = jefe ? mundo(jefeVista.x, jefeVista.y) : new THREE.Vector3(0, 0, -10);
+    const atras = new THREE.Vector3().subVectors(pk, pj).setY(0);
+    if (atras.lengthSq() < 0.01) atras.set(0, 0, 1);
+    atras.normalize();
+    // La cámara no sale de la arena (afuera hay muros y columnas que la taparían):
+    // si no cabe detrás del caballero, se acerca y sube para seguir viendo la escena.
+    const LIMITE = 9.6;
+    let distancia = 5.2;
+    for (const [p, d] of [[pk.x, atras.x], [pk.z, atras.z]]) {
+      if (d > 1e-6) distancia = Math.min(distancia, (LIMITE - p) / d);
+      if (d < -1e-6) distancia = Math.min(distancia, (-LIMITE - p) / d);
+    }
+    distancia = Math.max(1.2, distancia);
+    destino = pk.clone().addScaledVector(atras, distancia).add(new THREE.Vector3(0, 3.1 + (5.2 - distancia) * 0.9, 0));
+    mirar = pk.clone().lerp(pj, 0.35).add(new THREE.Vector3(0, 1.1, 0));
+  } else {                                     // pantalla de inicio y espectadores
+    const a = ahora / 9000;
+    destino = new THREE.Vector3(Math.sin(a) * 15, 8.5, Math.cos(a) * 15);
+    mirar = new THREE.Vector3(0, 0.8, 0);
+  }
+  const k = 1 - Math.exp(-dt * 5);
+  camara.position.lerp(destino, k);
+  miradaCamara.lerp(mirar, k);
+  sacudida = Math.max(0, sacudida - dt * 1.6);
+  const s = sacudida * sacudida;
+  objetivoCamara.copy(miradaCamara).add(new THREE.Vector3((Math.random() - 0.5) * s, (Math.random() - 0.5) * s, 0));
+  camara.lookAt(objetivoCamara);
+}
+
+let ultimo = performance.now();
+function cuadro(ahora) {
+  actualizarCuadro(ahora);
+  requestAnimationFrame(cuadro);
+}
+function actualizarCuadro(ahora) {
+  const dt = Math.min(0.05, (ahora - ultimo) / 1000); ultimo = ahora;
+  actualizarMovimiento(ahora);
+  if (actual) {
+    const alfa = limitar((ahora - tActual) / TICK_MS, 0, 1);
+    for (const [id, j] of Object.entries(actual.jugadores)) {
+      const c = caballeros.get(id);
+      if (c) animarCaballero(c, j, previo && previo.jugadores[id], alfa, ahora, dt);
+    }
+    if (jefeVista && actual.jefe) animarJefe(jefeVista, actual.jefe, previo && previo.jefe, alfa, ahora, dt);
+  }
+  animarMuertes(dt);
+  dibujarAvisos(ahora);
+  for (const l of llamas) {                    // fuego vivo
+    const f = 0.8 + Math.sin(ahora / 90 + l.fase) * 0.12 + Math.random() * 0.12;
+    l.luz.intensity = 22 * f;
+    l.fuego.scale.set(1, f, 1);
+    if (Math.random() < 0.25) particulas.emitir(l.fuego.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.4, 0)), 1, 0xff9a40, 0.6, { gravedad: -0.6, vida: 1.6, subir: 1 });
+  }
+  if (Math.random() < 0.3) {                   // ceniza que flota en el aire
+    particulas.emitir(new THREE.Vector3((Math.random() - 0.5) * 22, 0.2, (Math.random() - 0.5) * 22), 1, 0x6a5a50, 0.4, { gravedad: -0.15, vida: 4, subir: 0.5 });
+  }
+  particulas.actualizar(dt);
+  actualizarOndas(dt);
+  actualizarCamara(dt, ahora);
+  actualizarNumeros(dt);
+  renderer.render(escena, camara);
+}
+requestAnimationFrame(cuadro);
+
+// Para depurar desde la consola del navegador
+window.laTorre = {
+  get estado() { return actual; }, get conexion() { return ws; }, enviar, atacar, esquivar, camara, escena, THREE,
+  crearJefe, crearCaballero, renderer,
+  // avanza n cuadros a mano (sirve para probar con la pestaña oculta, donde el navegador pausa el dibujo)
+  avanzar(n = 60) { for (let i = 0; i < n; i++) actualizarCuadro(ultimo + 1000 / 60); },
+};
+</script>
+</body>
+</html>

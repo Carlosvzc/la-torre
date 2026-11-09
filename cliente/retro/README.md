@@ -1,0 +1,53 @@
+# Cliente 3D retro
+
+Estética 3D de 64 bits (finales de los 90), no realista: low-poly con sombreado plano, niebla de
+distancia, sombra redonda bajo cada personaje, paleta oscura y texturas nítidas en alta resolución.
+**Todo se genera por código** (modelos, arena, texturas y sonidos): no hay assets de terceros
+que licenciar. Usa [Three.js](https://threejs.org) 0.160 desde CDN (licencia MIT), así que la primera
+vez necesita internet.
+
+## Jugar en localhost
+1. Servidor del juego:
+   ```powershell
+   cd $HOME\OneDrive\Documents\la-torre\server
+   docker build -t torre-server .
+   docker run --rm -p 7654:7654 -p 9100:9100 torre-server
+   ```
+2. Servir los clientes (los módulos de JavaScript no cargan con doble clic, hace falta http):
+   ```powershell
+   cd $HOME\OneDrive\Documents\la-torre
+   py -3.11 -m http.server 8080 --directory cliente
+   ```
+3. Abre http://localhost:8080/retro/ , escribe tu nombre, **Entrar** y **Enter** para estar listo.
+
+Cooperativo: varias pestañas o PCs en la misma red (cambia `localhost` por la IP de la PC del servidor).
+
+## Controles
+| Tecla | Acción |
+|---|---|
+| `W A S D` | Mover **relativo al jefe** (W acerca, S aleja, A/D lo rodean) |
+| `J` o clic izquierdo | Atacar (el golpe apunta al jefe) |
+| `Espacio`, `K`, `Shift` o clic derecho | Esquivar (sin dirección: hacia atrás) |
+| `Enter` | Listo |
+| `1 2 3` o clic en la carta | Elegir bendición (mejora) |
+| `P` | Modo pixelado (render a baja resolución) |
+| `M` | Silenciar |
+
+## Qué se ve
+- **Aviso del jefe:** anillo rojo en el suelo con un disco que se llena; parpadea rápido justo antes del impacto.
+  El jefe alza su arma y brilla en rojo mientras prepara el golpe.
+- **Ventana de castigo:** tras el impacto el jefe baja el arma y se inclina: es el momento de atacar.
+- **Números:** blancos = daño al jefe, rojos = daño recibido, azules = esquiva.
+- Los caballeros cooperativos tienen colores distintos (rojo, azul, morado, verde).
+
+## Modelos
+| Jefe | Diseño |
+|---|---|
+| Guardián de Hierro | Gólem acorazado con martillo y visor ardiente |
+| Bruja de Ceniza | Túnica flotante y báculo con orbe de fuego |
+| Sabueso Abismal | Bestia de cuatro patas con cráneo y ojos violetas |
+| Rey sin Corona | Figura alta con espadón y corona incompleta |
+| Coloso del Eclipse | Gigante de roca con un halo de eclipse (jefe del día) |
+
+Para depurar desde la consola del navegador: `laTorre.estado` (último snapshot) y
+`laTorre.avanzar(60)` (avanza cuadros a mano si la pestaña está oculta).

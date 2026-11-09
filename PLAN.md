@@ -201,10 +201,15 @@ música ni diseños reconocibles de Nintendo o FromSoftware. Caballero, jefes y 
 - **Alcance máximo:** una arena y un jefe. Se califica la infraestructura, así que el cliente nunca
   retrasa una práctica.
 
-- [ ] Escena Three.js: arena con niebla, caballero y jefe low-poly, cámara en tercera persona
-- [ ] Conexión al servidor por WebSocket: dibujar el snapshot e interpolar entre ticks
-- [ ] Controles: mover, atacar, esquivar, elegir mejora; avisos del jefe en el suelo
-- [ ] Modo espectador con el mismo cliente
+- [x] Escena Three.js (`cliente/retro/`): arena con niebla, braseros, columnas y puerta; texturas
+      generadas en alta resolución (losas, ladrillo, metal, tela) — sin assets de terceros
+- [x] Caballero y 5 jefes low-poly generados por código, con animaciones (paso, tajo, voltereta,
+      muerte; el jefe alza el arma y brilla al preparar, surge del suelo y se hunde al morir)
+- [x] Cámara en tercera persona con el jefe fijado y movimiento relativo (estilo Souls)
+- [x] Avisos en el suelo, ondas de impacto, chispas, números de daño, sacudida de cámara, sonido sintetizado
+- [x] HUD: vida/resistencia, barra del jefe con fases, bendiciones, sala de espera, fin de run
+- [x] Modo espectador (cámara orbital) y modo pixelado (`P`)
+- [ ] Probarlo jugando tú (balance, sensación de control) y ajustar
 
 ## 5. Decisiones pendientes
 - ¿El profesor acepta espectadores por WebSocket en lugar de HLS?

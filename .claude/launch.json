@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "cliente-2d",
+      "name": "clientes",
       "runtimeExecutable": "py",
-      "runtimeArgs": ["-3.11", "-m", "http.server", "8080", "--bind", "127.0.0.1", "--directory", "cliente/prueba2d"],
+      "runtimeArgs": ["-3.11", "-m", "http.server", "8080", "--bind", "127.0.0.1", "--directory", "cliente"],
       "port": 8080
     }
   ]
