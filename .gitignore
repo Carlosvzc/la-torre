@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Credenciales: NUNCA subirlas (práctica 3.2 y 3.4)
+key.json
+*.pem
+*.key
+*.crt
+.env
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+terraform.tfvars
+
+# Pruebas de carga: los CSV crudos grandes se guardan aparte
+loadtest/*.csv
+
+# Modelos y notebooks
+ia/*.zip
+.ipynb_checkpoints/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
