@@ -168,7 +168,38 @@ la-torre/
 - [ ] Revisar `docs/capturas.md` completo
 
 ### Extra — Cliente gráfico (solo si sobra tiempo)
-- [ ] Three.js, una arena y un jefe, low-poly oscuro con assets libres (Kenney/Quaternius/OpenGameArt)
+
+**Dirección de arte:** 3D retro de la era de 64 bits (finales de los 90), **no realista**: low-poly
+de aventura en tercera persona, con texturas nítidas en alta resolución y ambiente oscuro de fantasía.
+Inspiración de *época y técnica*, no de un juego concreto: nada de personajes, lugares, logos,
+música ni diseños reconocibles de Nintendo o FromSoftware. Caballero, jefes y arena son diseños propios.
+
+| Rasgo de la época | Cómo se logra en Three.js |
+|---|---|
+| Pocos polígonos | Personajes de ~500–1 500 triángulos, arena de geometría simple |
+| Sombreado plano o Gouraud, sin PBR | `MeshLambertMaterial` / `flatShading`, sin mapas normales ni reflejos |
+| Niebla de distancia | `scene.fog` oscura que esconde el fondo |
+| Paleta limitada y saturada | Colores de vértice + texturas con paleta reducida |
+| Sombra simple | Círculo oscuro bajo cada personaje (*blob shadow*) |
+| Cámara de aventura | Tercera persona con fijación de objetivo sobre el jefe |
+| Efectos de sprite | Destellos y polvo como *billboards* |
+
+- **Texturas en alta resolución** (decisión tuya): se conserva la forma low-poly y la nitidez moderna.
+  Opción de un filtro "pixelado" (render a baja resolución + escalado `nearest`) para comparar.
+- **El servidor ya da lo que el cliente necesita:** posición y orientación (`x, y, dx, dy`), estado
+  (`atacando`, `esquivando`, `muerto`) para elegir la animación, y el **aviso** del jefe (`zonas`,
+  `radio`, `en`) que se dibuja como un círculo rojo en el suelo que se va llenando.
+  El servidor simula en un plano 2D y el cliente lo pinta en 3D sobre el suelo de la arena.
+- **Assets libres (CC0) en estilo parecido:** Quaternius (personajes y armas low-poly), Kenney
+  (piezas de mazmorra), OpenGameArt (texturas de piedra). Se anota la licencia de cada uno en
+  `cliente/CREDITOS.md`.
+- **Alcance máximo:** una arena y un jefe. Se califica la infraestructura, así que el cliente nunca
+  retrasa una práctica.
+
+- [ ] Escena Three.js: arena con niebla, caballero y jefe low-poly, cámara en tercera persona
+- [ ] Conexión al servidor por WebSocket: dibujar el snapshot e interpolar entre ticks
+- [ ] Controles: mover, atacar, esquivar, elegir mejora; avisos del jefe en el suelo
+- [ ] Modo espectador con el mismo cliente
 
 ## 5. Decisiones pendientes
 - ¿El profesor acepta espectadores por WebSocket en lugar de HLS?
