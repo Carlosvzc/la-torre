@@ -13,7 +13,7 @@ function Escribir($texto, $color = "Gray") { Write-Host $texto -ForegroundColor 
 # servidores de otros proyectos aunque también se llamen server.py.
 function ProcesosDelJuego {
     Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
-        Where-Object { $_.CommandLine -and $_.CommandLine.Contains($raiz) -and $_.CommandLine -match "server\.py|http\.server" }
+        Where-Object { $_.CommandLine -and $_.CommandLine.Contains($raiz) -and $_.CommandLine -match "server\.py|http\.server|servir_cliente\.py" }
 }
 
 Escribir ""
@@ -46,7 +46,7 @@ Start-Sleep -Milliseconds 500
 Escribir "Arrancando el servidor del juego..."
 $servidor = Start-Process $python -ArgumentList "`"$(Join-Path $raiz 'server\server.py')`"" -WorkingDirectory (Join-Path $raiz "server") `
     -WindowStyle Hidden -PassThru -RedirectStandardOutput "$logs\servidor-salida.log" -RedirectStandardError "$logs\servidor.log"
-$pagina = Start-Process $python -ArgumentList "-m", "http.server", "8080", "--bind", "127.0.0.1", "--directory", "`"$(Join-Path $raiz 'cliente')`"" `
+$pagina = Start-Process $python -ArgumentList "`"$(Join-Path $raiz 'scripts\servir_cliente.py')`"", "8080" `
     -WindowStyle Hidden -PassThru -RedirectStandardOutput "$logs\pagina-salida.log" -RedirectStandardError "$logs\pagina.log"
 
 # 3. Esperar a que respondan, y comprobar que contesta ESTE servidor (no uno viejo)
@@ -72,7 +72,7 @@ if ($otros) {
 }
 
 # 4. Abrir el juego
-if (-not $env:LA_TORRE_SIN_NAVEGADOR) { Start-Process "http://localhost:8080/retro/" }   # la variable sirve para pruebas
+if (-not $env:LA_TORRE_SIN_NAVEGADOR) { Start-Process "http://localhost:8080/retro/?v=$(Get-Date -Format yyyyMMddHHmmss)" }   # la variable sirve para pruebas
 Escribir ""
 Escribir "  El juego está corriendo:" "Green"
 Escribir "    Juego 3D ........ http://localhost:8080/retro/"

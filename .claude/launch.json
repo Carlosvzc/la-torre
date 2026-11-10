@@ -4,7 +4,7 @@
     {
       "name": "clientes",
       "runtimeExecutable": "py",
-      "runtimeArgs": ["-3.11", "-m", "http.server", "8080", "--bind", "127.0.0.1", "--directory", "cliente"],
+      "runtimeArgs": ["-3.11", "scripts/servir_cliente.py", "8080"],
       "port": 8080
     }
   ]
