@@ -25,6 +25,8 @@ loadtest/*.csv
 
 # Modelos y notebooks
 ia/*.zip
+ia/modelos/*.zip
+ia/colab/
 .ipynb_checkpoints/
 
 # Sistema

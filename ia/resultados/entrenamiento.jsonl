@@ -1,0 +1,1 @@
+{"nombre": "bot_cpu_100k", "device": "cpu", "pasos": 100000, "entornos": 1, "segundos": 158.8, "pasos_por_s": 630, "cpu": "AMD64 Family 25 Model 68 Stepping 1, AuthenticAMD", "hilos_torch": 6, "gpu": null, "torch": "2.15.0+cpu", "fecha": "2026-11-09 21:34"}
