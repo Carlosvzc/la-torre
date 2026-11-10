@@ -11,6 +11,24 @@ El plan completo y el avance están en [PLAN.md](PLAN.md).
 - 4 jefes por run; al vencer a cada uno, el servidor ofrece 3 mejoras al azar.
 - Solo o cooperativo de 2 a 4 jugadores. La run termina en victoria (4 jefes) o derrota (todos caídos).
 
+## Jugar con un doble clic
+
+En el escritorio está el acceso **La Torre** (ícono de la torre). Al abrirlo:
+1. apaga copias anteriores del juego (solo procesos de este proyecto) y cualquier contenedor de
+   Docker que tape el puerto 7654;
+2. arranca el servidor del juego y la página, y comprueba que responde el servidor actual;
+3. abre http://localhost:8080/retro/ en el navegador.
+
+Deja la ventana abierta mientras juegas; **pulsa Enter en ella para apagarlo todo**. Los registros
+quedan en `logs/`. Si se borra el acceso, se recrea con:
+
+```powershell
+$s = (New-Object -ComObject WScript.Shell).CreateShortcut("$([Environment]::GetFolderPath('Desktop'))\La Torre.lnk")
+$s.TargetPath = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+$s.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$PWD\scripts\iniciar-juego.ps1`""
+$s.WorkingDirectory = "$PWD"; $s.IconLocation = "$PWD\scripts\la-torre.ico,0"; $s.Save()
+```
+
 ## Entorno local (Windows / PowerShell)
 
 El entorno virtual va **fuera de OneDrive** para que no se sincronicen miles de archivos:

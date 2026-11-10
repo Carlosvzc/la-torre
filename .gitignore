@@ -36,3 +36,6 @@ desktop.ini
 
 # Resultados de pruebas locales de Locust (los de la nube se guardan)
 loadtest/resultados/local*
+
+# Registros del lanzador del juego
+logs/
