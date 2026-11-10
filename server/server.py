@@ -94,6 +94,7 @@ class Servidor:
         self.espectadores: set = set()
         self.con_agones = False
         self.asignado = False          # ya se llamó a /allocate en esta run
+        self.latiendo = False          # hay un /health en curso
         self.cerrando = False
         self.n_tick = 0
         self.eventos_espectador: list[dict] = []
@@ -226,14 +227,22 @@ class Servidor:
             self.partida = Partida(modo=self.modo, semilla=self.semilla)
             self.asignado = False
 
+    async def _latir(self) -> None:
+        try:
+            await asyncio.to_thread(agones, "/health")
+        finally:
+            self.latiendo = False
+
     async def bucle(self) -> None:
         siguiente = time.perf_counter()
         while not self.cerrando:
             t = time.perf_counter()
             self.tick()
             TICK.observe(time.perf_counter() - t)
-            if self.n_tick % LATIDO_TICKS == 0:
-                await asyncio.to_thread(agones, "/health")
+            if self.n_tick % LATIDO_TICKS == 0 and self.con_agones and not self.latiendo:
+                # El latido va en segundo plano: si el SDK tarda, la partida no se congela
+                self.latiendo = True
+                asyncio.get_running_loop().create_task(self._latir())
             if self.partida.terminada:
                 await self.terminar_run()
             # Tick de periodo fijo: se descuenta lo que tardó este tick

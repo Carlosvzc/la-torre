@@ -31,3 +31,6 @@ ia/*.zip
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Resultados de pruebas locales de Locust (los de la nube sí se guardan)
+loadtest/resultados/local*

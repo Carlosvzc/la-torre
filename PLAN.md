@@ -123,7 +123,9 @@ la-torre/
 - [x] Cliente 2D de pruebas en el navegador (`cliente/prueba2d/`): jugar, cooperativo y espectador
 - [x] Colisión caballero–jefe (encontrada al probar el cliente); imagen 1.3, 73 pruebas
 - [ ] Tomar **capturas 3.3 (1 y 2)** siguiendo `docs/capturas.md`
-- [ ] Locust local: `Jugador` hace una run completa con acciones aleatorias contra el contenedor
+- [x] Locust local: `Jugador` (run completa, RTT) y `Espectador` (huecos y bytes) contra el servidor
+- [x] Corregido: el latido `/health` congelaba los ticks ~2 s cada 2 s (encontrado con Locust; 75 pruebas)
+- [ ] Para 3.4: revisar los errores sueltos al cambiar de run (conexión rechazada y timeout de 5 s)
 - [ ] Commit por cada pieza
 
 ### Fase 2 — Práctica 3.1 (11 nov)

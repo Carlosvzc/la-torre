@@ -95,6 +95,37 @@ def test_la_duracion_de_la_run_empieza_con_el_primer_jugador():
     assert p.tiempo_total == pytest.approx(1.0)
 
 
+# --- Hallazgo 9 (prueba de Locust): un SDK de Agones lento no puede congelar los ticks ---
+def test_latido_lento_de_agones_no_congela_el_tick(monkeypatch):
+    import time as _time
+    monkeypatch.setattr(server, "agones", lambda ruta: _time.sleep(0.8) or True)
+    monkeypatch.setattr(server, "LATIDO_TICKS", 2)          # latido muy seguido para la prueba
+
+    async def caso():
+        srv = server.Servidor(semilla=1)
+        srv.con_agones = True
+        tarea = asyncio.create_task(srv.bucle())
+        await asyncio.sleep(1.0)
+        tarea.cancel()
+        return srv.n_tick
+    ticks = asyncio.run(caso())
+    assert ticks >= 15, f"solo {ticks} ticks en 1 s: el latido está bloqueando el bucle"
+
+
+def test_sin_agones_no_se_manda_latido(monkeypatch):
+    llamadas = []
+    monkeypatch.setattr(server, "agones", lambda ruta: llamadas.append(ruta) or False)
+    monkeypatch.setattr(server, "LATIDO_TICKS", 2)
+
+    async def caso():
+        srv = server.Servidor(semilla=1)                   # con_agones = False (local)
+        tarea = asyncio.create_task(srv.bucle())
+        await asyncio.sleep(0.3)
+        tarea.cancel()
+    asyncio.run(caso())
+    assert "/health" not in llamadas
+
+
 # --- Hallazgo 5: presentación mal formada → cierre limpio 4002 -----------------------
 @pytest.mark.parametrize("hola", ['{"hola": "texto"}', '{"hola": 5}', '{"otro": 1}', "[]"])
 def test_presentacion_mal_formada_cierra_con_4002(hola):
