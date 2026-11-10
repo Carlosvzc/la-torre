@@ -132,11 +132,13 @@ la-torre/
 - [ ] Commit por cada pieza
 
 ### Fase 2 — Práctica 3.1 (11 nov)
-- [ ] `entorno_duelo.py` (Gymnasium) reutilizando `combate.py`
-- [ ] Entrenar PPO en CPU (local) y GPU (Colab T4); tiempos reales
-- [ ] Latencia de inferencia y decisiones/s por núcleo
-- [ ] Cálculo de vCPU para 2 000 bots a 10 Hz y costo/hora (calculadora oficial)
-- [ ] `docs/practica-3.1.md` con la tabla y la explicación CPU vs GPU
+- [x] `entorno_duelo.py` (Gymnasium) reutilizando la lógica real del servidor
+- [x] Entrenar PPO en CPU local: 100k pasos en 158.8 s (20 % victorias); 1M pasos en 928.6 s (100 %)
+- [ ] Entrenar en GPU T4 de Colab (**te toca**: notebook `ia/entrenar_bot_colab.ipynb`)
+- [x] Latencia de inferencia y decisiones/s por núcleo (PyTorch 0.43 ms vs numpy 0.016 ms)
+- [x] Cálculo de vCPU para 2 000 bots a 10 Hz (12 con PyTorch, 1 con numpy)
+- [ ] Costo por hora con la calculadora oficial (**te toca**: 3 recursos en `docs/practica-3.1.md`)
+- [x] `docs/practica-3.1.md` (falta solo la columna de GPU, el análisis CPU vs GPU y el costo)
 
 ### Fase 3 — Kubernetes local y archivos de nube validados (11 nov)
 - [ ] Clúster kind + Agones con Helm
@@ -150,7 +152,7 @@ la-torre/
 ### Fase 4 — Modos 2 y 3 (solo con la Torre funcionando)
 - [ ] Duelo PvP 1v1 + emparejador + bot a los 5 s + tests
 - [ ] Jefe del día (`MODO=jefe_dia`) + Fleet propia
-- [ ] Espectadores por WebSocket + métricas de egress
+- [x] Espectadores por WebSocket + métricas de egress (`torre_bytes_sent_total`, hecho en la Fase 1)
 
 ### Fase 5 — Leaderboard serverless en local (11–12 nov)
 - [ ] `serverless/leaderboard/main.py` con almacén intercambiable (memoria / Firestore) + tests
