@@ -28,7 +28,11 @@ import urllib.request
 import websockets
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
+from juego.combate import CLASES
 from juego.partida import MAX_JUGADORES, Partida
+
+# Catálogo que se manda en la bienvenida: el cliente anima con los tiempos del servidor
+CATALOGO_CLASES = {k: c.publico() for k, c in CLASES.items()}
 
 MODO = os.getenv("MODO", "torre")
 PUERTO = int(os.getenv("PUERTO", "7654"))
@@ -116,6 +120,7 @@ class Servidor:
             return
         rol = hola.get("rol", "jugador")
         jugador_id = str(hola.get("id", ""))[:24]
+        clase = hola.get("clase", "caballero")
 
         if rol == "espectador":
             await self._atender_espectador(ws)
@@ -134,7 +139,10 @@ class Servidor:
         if jugador_id in self.partida.jugadores:
             await ws.close(code=4004, reason="ese id ya está en la partida")
             return
-        if not self.partida.agregar_jugador(jugador_id):
+        if not isinstance(clase, str) or clase not in CLASES:
+            await ws.close(code=4005, reason="clase desconocida")
+            return
+        if not self.partida.agregar_jugador(jugador_id, clase):
             await ws.close(code=4001, reason="la run ya empezó")
             return
 
@@ -145,8 +153,8 @@ class Servidor:
             # él mismo: así el FleetAutoscaler no puede borrarlo con gente jugando.
             self.asignado = True
             await asyncio.to_thread(agones, "/allocate")
-        await self._enviar(ws, {"bienvenida": {"id": jugador_id, "rol": "jugador",
-                                               "modo": self.modo}}, "jugador")
+        await self._enviar(ws, {"bienvenida": {"id": jugador_id, "rol": "jugador", "modo": self.modo,
+                                               "clase": clase, "clases": CATALOGO_CLASES}}, "jugador")
         try:
             async for msg in ws:
                 await self._procesar(ws, jugador_id, msg)
@@ -160,8 +168,8 @@ class Servidor:
     async def _atender_espectador(self, ws) -> None:
         self.espectadores.add(ws)
         ESPECTADORES.set(len(self.espectadores))
-        await self._enviar(ws, {"bienvenida": {"rol": "espectador", "modo": self.modo}},
-                           "espectador")
+        await self._enviar(ws, {"bienvenida": {"rol": "espectador", "modo": self.modo,
+                                               "clases": CATALOGO_CLASES}}, "espectador")
         try:
             async for msg in ws:                 # los espectadores solo pueden medir ping
                 await self._procesar(ws, None, msg)

@@ -38,6 +38,7 @@ from gevent.lock import Semaphore
 from locust import User, constant, events, task
 from websocket import ABNF, WebSocketException, WebSocketTimeoutException, create_connection
 
+from estrategia import CLASES as CLASES_ESTRATEGIA
 from estrategia import decidir
 
 SERVIDOR_WS = os.getenv("SERVIDOR_WS", "")
@@ -46,6 +47,7 @@ FLOTA = os.getenv("FLOTA", "torre-fleet")
 GRUPO = max(1, min(4, int(os.getenv("JUGADORES_POR_RUN", "2"))))
 HABILIDAD = float(os.getenv("HABILIDAD", "0.85"))
 ESPECTAR = [u.strip() for u in os.getenv("ESPECTAR", "").split(",") if u.strip()]
+CLASE = os.getenv("CLASE", "mezcla")          # una clase fija o "mezcla" (cada bot elige al azar)
 CERTS = {"cert": ("client.crt", "client.key"), "verify": "ca.crt"}
 SNAPSHOT_TARDIO_S = 0.3       # un espectador "se congela" si pasan más de 300 ms sin snapshot
 PONG_PERDIDO_S = 5.0          # si el pong no llega en 5 s, se da por perdido y se vuelve a medir
@@ -129,6 +131,7 @@ class Jugador(User):
     def on_start(self):
         self.id = "bot-" + uuid.uuid4().hex[:6]
         self.rng = random.Random()
+        self.clase = self.rng.choice(CLASES_ESTRATEGIA) if CLASE == "mezcla" else CLASE
 
     @task
     def run_completa(self):
@@ -140,7 +143,7 @@ class Jugador(User):
         t0 = time.perf_counter()
         try:
             ws = create_connection(url, timeout=10)
-            ws.send(json.dumps({"hola": {"id": self.id, "rol": "jugador"}}))
+            ws.send(json.dumps({"hola": {"id": self.id, "rol": "jugador", "clase": self.clase}}))
             bienvenida = recibir_mensaje(ws)
             if "bienvenida" not in bienvenida:
                 raise WebSocketException(f"respuesta inesperada: {bienvenida}")

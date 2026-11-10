@@ -72,7 +72,8 @@ def test_las_acciones_las_decide_el_servidor():
             await ws.send(json.dumps({"accion": "mover", "dx": 1, "dy": 0, "vida": 9999}))
             await ws.send(json.dumps({"accion": "atacar"}))
             snap = await esperar_snapshot(ws, lambda d: d["jugadores"]["ana"]["st"] < 100)
-            assert snap["jugadores"]["ana"]["vida"] <= 100
+            ana = snap["jugadores"]["ana"]
+            assert ana["vida"] <= ana["vida_max"]           # el 9999 que mandó el cliente no cuenta
             await ws.close()
     correr(caso())
 

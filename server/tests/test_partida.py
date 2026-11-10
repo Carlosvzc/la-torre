@@ -137,7 +137,8 @@ def test_en_cooperativo_los_caidos_reviven_al_vencer_al_jefe():
     p.jefe.recibir_dano(1e9)
     p.paso(DT)
     assert p.jugadores["beto"].vivo
-    assert p.jugadores["beto"].vida == pytest.approx(100 * P.VIDA_AL_REVIVIR)
+    beto = p.jugadores["beto"]
+    assert beto.vida == pytest.approx(beto.vida_max * P.VIDA_AL_REVIVIR)
 
 
 def test_si_todos_se_van_la_partida_se_abandona():

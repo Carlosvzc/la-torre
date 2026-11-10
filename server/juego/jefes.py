@@ -104,6 +104,10 @@ class Jefe:
     ataque: Ataque | None = None
     zonas: list[tuple[float, float]] = field(default_factory=list)  # dónde caerá el golpe
     fase: int = 0
+    lento: float = 0.0             # segundos que le quedan ralentizado (Nova de escarcha)
+
+    def ralentizar(self, segundos: float) -> None:
+        self.lento = max(self.lento, segundos)
 
     @classmethod
     def crear(cls, definicion: DefJefe, piso: int, jugadores: int) -> "Jefe":
@@ -151,7 +155,8 @@ class Jefe:
         if objetivo is None:
             return []
         fase = self.fase_actual
-        self.temporizador -= dt
+        self.lento = max(0.0, self.lento - dt)
+        self.temporizador -= dt * (0.75 if self.lento > 0 else 1.0)   # ralentizado: avisos más largos
 
         if self.estado == "persiguiendo":
             d = distancia(self.x, self.y, objetivo.x, objetivo.y)
@@ -161,6 +166,8 @@ class Jefe:
             elif d > self.definicion.radio + 1.5:
                 dx, dy = normalizar(objetivo.x - self.x, objetivo.y - self.y)
                 v = self.definicion.velocidad * self.mult_velocidad * fase.mult_velocidad
+                if self.lento > 0:
+                    v *= 0.5                                   # la escarcha lo frena a la mitad
                 self._mover(dx * v * dt, dy * v * dt)
             return []
 
@@ -211,7 +218,7 @@ class Jefe:
             "id": self.definicion.id, "nombre": self.definicion.nombre,
             "x": round(self.x, 2), "y": round(self.y, 2), "radio": self.definicion.radio,
             "vida": round(self.vida, 1), "vida_max": round(self.vida_max, 1),
-            "estado": self.estado, "fase": self.fase + 1,
+            "estado": self.estado, "fase": self.fase + 1, "lento": round(self.lento, 1),
             "fases": len(self.definicion.fases),
         }
         if self.estado == "preparando":                 # el aviso que permite esquivar

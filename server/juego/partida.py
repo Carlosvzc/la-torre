@@ -11,8 +11,9 @@ from __future__ import annotations
 import random
 
 from . import mejoras
-from .combate import (ALCANCE_ATAQUE, ARENA_LADO, RADIO_CABALLERO, Caballero, distancia,
-                      limitar, numero_seguro)
+from .combate import (ARENA_LADO, BOLA_RADIO, BOLA_VUELO, CLASES, NOVA_DANO, NOVA_LENTITUD,
+                      NOVA_RADIO, RADIO_CABALLERO, Caballero, distancia, limitar, nuevo_jugador,
+                      numero_seguro)
 from .jefes import JEFE_DEL_DIA, JEFES, DefJefe, Jefe
 
 MAX_JUGADORES = 4             # cooperativo de 1 a 4
@@ -45,21 +46,22 @@ class Partida:
         self.temporizador = 0.0
         self.eventos: list[dict] = []
         self.motivo_fin = ""
+        self.proyectiles: list[dict] = []   # bolas de fuego en vuelo
 
     # --- Jugadores ---------------------------------------------------------
     @property
     def terminada(self) -> bool:
         return self.estado in TERMINALES
 
-    def agregar_jugador(self, jugador_id: str) -> bool:
-        """Solo se entra en la sala de espera y mientras haya lugar."""
+    def agregar_jugador(self, jugador_id: str, clase: str = "caballero") -> bool:
+        """Solo se entra en la sala de espera, mientras haya lugar y con una clase válida."""
         if (self.estado != "esperando" or jugador_id in self.jugadores
-                or len(self.jugadores) >= self.max_jugadores):
+                or len(self.jugadores) >= self.max_jugadores or clase not in CLASES):
             return False
         if not self.jugadores:
             self.temporizador = ESPERA_INICIO
-        self.jugadores[jugador_id] = Caballero(jugador_id)
-        self._evento("entra", jugador=jugador_id)
+        self.jugadores[jugador_id] = nuevo_jugador(jugador_id, clase)
+        self._evento("entra", jugador=jugador_id, clase=clase)
         return True
 
     def quitar_jugador(self, jugador_id: str) -> None:
@@ -83,8 +85,13 @@ class Partida:
             self.listos.add(jugador_id)
         elif accion == "mover":
             c.fijar_movimiento(dx, dy)
-        elif accion in ("atacar", "esquivar") and self.estado == "combate":
+        elif accion in ("atacar", "esquivar", "habilidad") and self.estado == "combate":
             c.pedir({"accion": accion, "dx": dx, "dy": dy})
+        elif accion == "clase" and self.estado == "esperando":
+            clase = msg.get("clase")                # cambiar de clase solo en la sala
+            if isinstance(clase, str) and clase in CLASES and clase != c.clase:
+                self.jugadores[jugador_id] = nuevo_jugador(jugador_id, clase)
+                self._evento("clase", jugador=jugador_id, clase=clase)
         elif accion == "elegir_mejora" and self.estado == "mejora":
             mejora = msg.get("id")
             if (isinstance(mejora, str) and mejora in self.ofertas.get(jugador_id, [])
@@ -118,14 +125,13 @@ class Partida:
     def _paso_combate(self, dt: float) -> None:
         self.tiempo_combate += dt
         jefe = self.jefe
-        alcance = ALCANCE_ATAQUE + jefe.definicion.radio
         for c in self.jugadores.values():
-            if (c.paso(dt) and distancia(c.x, c.y, jefe.x, jefe.y) <= alcance
-                    and c.de_frente_a(jefe.x, jefe.y)):
-                real = jefe.recibir_dano(c.dano)
-                c.dano_causado += real
-                c.curar(real * c.robo_vida)
-                self._evento("golpe", jugador=c.id, dano=round(real, 1))
+            if c.paso(dt):
+                self._resolver_ataque(c, jefe)
+            if c.nova_pendiente:
+                c.nova_pendiente = False
+                self._resolver_nova(c, jefe)
+        self._paso_proyectiles(dt, jefe)
         self.eventos += jefe.paso(dt, list(self.jugadores.values()), self.rng)
         self._separar(jefe)
 
@@ -137,6 +143,50 @@ class Partida:
                 self._ofrecer_mejoras()
         elif not any(c.vivo for c in self.jugadores.values()):
             self._terminar("derrota", f"caídos ante {jefe.definicion.nombre}")
+
+    # --- Ataques de cada clase --------------------------------------------------
+    def _danar_jefe(self, c: Caballero, jefe: Jefe, cantidad: float, tipo: str) -> None:
+        real = jefe.recibir_dano(cantidad)
+        c.dano_causado += real
+        c.curar(real * c.robo_vida)
+        self._evento("golpe", jugador=c.id, dano=round(real, 1), ataque=tipo)
+
+    def _resolver_ataque(self, c: Caballero, jefe: Jefe) -> None:
+        """El ataque se suelta este tick: tajo y flecha pegan al instante; la bola vuela."""
+        d = distancia(c.x, c.y, jefe.x, jefe.y)
+        al_alcance = d <= c.alcance + jefe.definicion.radio
+        if c.tipo_ataque == "bola":
+            if al_alcance:                       # apunta a donde está el jefe AHORA
+                self.proyectiles.append({"x0": c.x, "y0": c.y, "x": jefe.x, "y": jefe.y,
+                                         "en": BOLA_VUELO, "dano": c.dano_efectivo(d), "autor": c.id})
+                self._evento("hechizo", jugador=c.id, x=round(jefe.x, 2), y=round(jefe.y, 2))
+            else:
+                self._evento("fallo", jugador=c.id, ataque="bola")
+            return
+        acierta = al_alcance and c.de_frente_a(jefe.x, jefe.y)
+        if c.tipo_ataque == "flecha":            # el cliente dibuja la flecha volando
+            self._evento("disparo", jugador=c.id, acierto=acierta, cargado=c.cargado)
+        if acierta:
+            self._danar_jefe(c, jefe, c.dano_efectivo(d), "cargado" if c.cargado else c.tipo_ataque)
+
+    def _paso_proyectiles(self, dt: float, jefe: Jefe) -> None:
+        """Las bolas de fuego estallan en la zona marcada: si el jefe se movió, fallan."""
+        for p in list(self.proyectiles):
+            p["en"] -= dt
+            if p["en"] > 0:
+                continue
+            self.proyectiles.remove(p)
+            acierta = jefe.vivo and distancia(p["x"], p["y"], jefe.x, jefe.y) <= BOLA_RADIO + jefe.definicion.radio
+            self._evento("explosion", jugador=p["autor"], x=round(p["x"], 2), y=round(p["y"], 2), acierto=acierta)
+            autor = self.jugadores.get(p["autor"])
+            if acierta and autor is not None:
+                self._danar_jefe(autor, jefe, p["dano"], "bola")
+
+    def _resolver_nova(self, c: Caballero, jefe: Jefe) -> None:
+        self._evento("nova", jugador=c.id, x=round(c.x, 2), y=round(c.y, 2), radio=NOVA_RADIO)
+        if distancia(c.x, c.y, jefe.x, jefe.y) <= NOVA_RADIO + jefe.definicion.radio:
+            self._danar_jefe(c, jefe, NOVA_DANO * (c.dano_efectivo(0) / c.dano), "nova")
+            jefe.ralentizar(NOVA_LENTITUD)
 
     def _separar(self, jefe: Jefe) -> None:
         """Colisión simple: nadie puede quedar dentro del cuerpo del jefe."""
@@ -163,6 +213,7 @@ class Partida:
             c.reiniciar_accion()                  # nada de golpes pendientes del piso anterior
             c.dir_x, c.dir_y = 0.0, 1.0           # todos miran hacia el jefe
             c.stamina = c.stamina_max
+        self.proyectiles = []
         self.estado = "combate"
         self._evento("piso", piso=self.piso + 1, jefe=self.jefe.definicion.nombre)
 
@@ -200,6 +251,10 @@ class Partida:
             "jefe": self.jefe.resumen() if self.jefe else None,
             "eventos": self.eventos,
         }
+        if self.proyectiles:                     # bolas de fuego en vuelo (para dibujarlas)
+            datos["proyectiles"] = [{"x0": round(p["x0"], 2), "y0": round(p["y0"], 2),
+                                     "x": round(p["x"], 2), "y": round(p["y"], 2),
+                                     "en": round(p["en"], 2), "autor": p["autor"]} for p in self.proyectiles]
         if self.estado == "esperando":
             datos["inicio_en"] = round(max(0.0, self.temporizador), 1)
         if self.estado == "mejora":
