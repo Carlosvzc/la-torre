@@ -34,6 +34,22 @@ from juego.partida import MAX_JUGADORES, Partida
 # Catálogo que se manda en la bienvenida: el cliente anima con los tiempos del servidor
 CATALOGO_CLASES = {k: c.publico() for k, c in CLASES.items()}
 
+
+def direccion_lan() -> str | None:
+    """IP de esta PC en la red local (para que los amigos se unan). No envía nada por la red:
+    'conectar' un socket UDP solo elige la interfaz de salida."""
+    import socket
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("10.255.255.255", 1))
+            ip = s.getsockname()[0]
+        return None if ip.startswith("127.") else ip
+    except OSError:
+        return None
+
+
+DIRECCION_LAN = direccion_lan()
+
 MODO = os.getenv("MODO", "torre")
 PUERTO = int(os.getenv("PUERTO", "7654"))
 PUERTO_METRICAS = int(os.getenv("PUERTO_METRICAS", "9100"))
@@ -121,6 +137,7 @@ class Servidor:
         rol = hola.get("rol", "jugador")
         jugador_id = str(hola.get("id", ""))[:24]
         clase = hola.get("clase", "caballero")
+        sala = hola.get("sala", "grupo")            # "solo" (solitario) o "grupo" (multijugador)
 
         if rol == "espectador":
             await self._atender_espectador(ws)
@@ -130,6 +147,7 @@ class Servidor:
             return
         # Códigos de rechazo (el cliente los muestra y Locust los reporta tal cual):
         #   4000 partida llena · 4001 la run ya empezó · 4003 la run está terminando · 4004 id repetido
+        #   4005 clase desconocida · 4006 el modo de sala no lo permite (solitario / grupo esperando)
         if self.cerrando or self.terminando or self.partida.terminada:
             await ws.close(code=4003, reason="la run está terminando; intenta en unos segundos")
             return
@@ -142,7 +160,13 @@ class Servidor:
         if not isinstance(clase, str) or clase not in CLASES:
             await ws.close(code=4005, reason="clase desconocida")
             return
-        if not self.partida.agregar_jugador(jugador_id, clase):
+        motivo = self.partida.puede_entrar(sala if isinstance(sala, str) else "")
+        if motivo:
+            # 4006 = el modo de sala no lo permite (solitario ocupado, o un grupo esperando)
+            await ws.close(code=4001 if motivo == "la run ya empezó" else 4000 if motivo == "partida llena" else 4006,
+                           reason=motivo)
+            return
+        if not self.partida.agregar_jugador(jugador_id, clase, sala):
             await ws.close(code=4001, reason="la run ya empezó")
             return
 
@@ -154,7 +178,9 @@ class Servidor:
             self.asignado = True
             await asyncio.to_thread(agones, "/allocate")
         await self._enviar(ws, {"bienvenida": {"id": jugador_id, "rol": "jugador", "modo": self.modo,
-                                               "clase": clase, "clases": CATALOGO_CLASES}}, "jugador")
+                                               "clase": clase, "clases": CATALOGO_CLASES,
+                                               "sala": self.partida.sala, "max": MAX_JUGADORES,
+                                               "direccion_lan": DIRECCION_LAN}}, "jugador")
         try:
             async for msg in ws:
                 await self._procesar(ws, jugador_id, msg)

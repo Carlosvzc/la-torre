@@ -60,11 +60,12 @@ def test_la_run_empieza_sola_tras_la_espera():
     assert p.estado == "combate"
 
 
-def test_maximo_cuatro_jugadores_y_nadie_entra_ya_iniciada():
+def test_maximo_tres_jugadores_y_nadie_entra_ya_iniciada():
     p = Partida(semilla=1)
-    assert all(p.agregar_jugador(f"j{i}") for i in range(4))
-    assert not p.agregar_jugador("quinto")
-    for i in range(4):
+    assert P.MAX_JUGADORES == 3
+    assert all(p.agregar_jugador(f"j{i}") for i in range(3))
+    assert not p.agregar_jugador("cuarto")
+    for i in range(3):
         p.recibir(f"j{i}", {"accion": "listo"})
     p.paso(DT)
     assert not p.agregar_jugador("tarde")

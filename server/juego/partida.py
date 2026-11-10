@@ -14,10 +14,17 @@ from . import mejoras
 from .combate import (ARENA_LADO, BOLA_RADIO, BOLA_VUELO, CLASES, NOVA_DANO, NOVA_LENTITUD,
                       NOVA_RADIO, RADIO_CABALLERO, Caballero, distancia, limitar, nuevo_jugador,
                       numero_seguro)
+from .estrategia import decidir
 from .jefes import JEFE_DEL_DIA, JEFES, DefJefe, Jefe
 
-MAX_JUGADORES = 4             # cooperativo de 1 a 4
-ESPERA_INICIO = 15.0          # si no todos dicen "listo", la run empieza sola
+MAX_JUGADORES = 3             # cooperativo de hasta 3 personas
+ESPERA_INICIO = 60.0          # multijugador: si no todos dicen "listo", la run empieza sola
+# solitario (empieza ya, nadie más entra) · con bots (tú + 2 compañeros IA, empieza ya) ·
+# multijugador (sala de espera hasta 3 personas)
+SALAS = ("solo", "bots", "grupo")
+NOMBRES_BOTS = ("Alba (IA)", "Ébano (IA)")
+HABILIDAD_BOTS = 0.9          # buenos, pero fallan a veces (como un compañero humano)
+TICKS_DECISION_BOTS = 2       # deciden 10 veces por segundo
 ESPERA_MEJORA = 20.0          # tiempo para elegir mejora; luego se elige la primera
 DURACION_MAXIMA = 15 * 60.0   # una run no puede ocupar un servidor para siempre
 VIDA_AL_REVIVIR = 0.3         # en cooperativo, los caídos vuelven al vencer al jefe
@@ -47,22 +54,68 @@ class Partida:
         self.eventos: list[dict] = []
         self.motivo_fin = ""
         self.proyectiles: list[dict] = []   # bolas de fuego en vuelo
+        self.sala: str | None = None        # la elige el primer jugador: "solo", "bots" o "grupo"
+        self.bots: set[str] = set()         # compañeros controlados por el servidor
+        self.ticks = 0
 
     # --- Jugadores ---------------------------------------------------------
     @property
     def terminada(self) -> bool:
         return self.estado in TERMINALES
 
-    def agregar_jugador(self, jugador_id: str, clase: str = "caballero") -> bool:
-        """Solo se entra en la sala de espera, mientras haya lugar y con una clase válida."""
-        if (self.estado != "esperando" or jugador_id in self.jugadores
-                or len(self.jugadores) >= self.max_jugadores or clase not in CLASES):
+    def puede_entrar(self, sala: str = "grupo") -> str | None:
+        """None si se puede entrar con ese modo de sala; si no, el motivo (para el cliente)."""
+        if sala not in SALAS:
+            return "modo de sala desconocido"
+        if self.sala == "solo":
+            return "esta partida es en solitario"
+        if self.sala == "bots":
+            return "esta partida es de un jugador con bots"
+        if self.sala == "grupo" and sala != "grupo":
+            return "hay un grupo esperando: entra en multijugador"
+        if self.estado != "esperando":
+            return "la run ya empezó"
+        if len(self.jugadores) >= self.max_jugadores:
+            return "partida llena"
+        return None
+
+    def agregar_jugador(self, jugador_id: str, clase: str = "caballero", sala: str = "grupo") -> bool:
+        """Solo se entra en la sala de espera, mientras haya lugar y con clase y modo válidos.
+
+        El primer jugador decide el modo: en solitario la run empieza ya y nadie más entra;
+        en grupo se espera a que todos digan "listo" (hasta 3 jugadores).
+        """
+        if jugador_id in self.jugadores or clase not in CLASES or self.puede_entrar(sala):
             return False
-        if not self.jugadores:
-            self.temporizador = ESPERA_INICIO
+        primero = not self.jugadores
+        if primero:
+            self.sala = sala
+            self.temporizador = ESPERA_INICIO if sala == "grupo" else 0.0
         self.jugadores[jugador_id] = nuevo_jugador(jugador_id, clase)
         self._evento("entra", jugador=jugador_id, clase=clase)
+        if primero and sala == "bots":
+            self._agregar_bots(clase)
         return True
+
+    def _agregar_bots(self, clase_humano: str) -> None:
+        """Dos compañeros IA con clases distintas a la del jugador (el grupo queda en 3)."""
+        otras = [c for c in CLASES if c != clase_humano]
+        for nombre, clase in zip(NOMBRES_BOTS, self.rng.sample(otras, len(NOMBRES_BOTS))):
+            self.jugadores[nombre] = nuevo_jugador(nombre, clase)
+            self.bots.add(nombre)
+            self.listos.add(nombre)
+            self._evento("entra", jugador=nombre, clase=clase, bot=True)
+
+    def _decidir_bots(self) -> None:
+        """Los compañeros IA ven lo mismo que un jugador (el estado público) y mandan acciones."""
+        if not self.bots:
+            return
+        vista = self._estado_publico()
+        for bot in self.bots:
+            if bot in self.jugadores:
+                accion = decidir(vista, bot, HABILIDAD_BOTS, self.rng)
+                if accion:
+                    self.recibir(bot, accion)
 
     def quitar_jugador(self, jugador_id: str) -> None:
         if self.jugadores.pop(jugador_id, None) is None:
@@ -71,7 +124,10 @@ class Partida:
         self.ofertas.pop(jugador_id, None)
         self.elegidas.pop(jugador_id, None)
         self._evento("sale", jugador=jugador_id)
-        if not self.jugadores and not self.terminada:
+        humanos = [j for j in self.jugadores if j not in self.bots]
+        if not humanos and not self.terminada:              # los bots no juegan solos
+            for bot in list(self.bots):
+                self.jugadores.pop(bot, None)
             self._terminar("abandonada", "todos los jugadores se fueron")
 
     def recibir(self, jugador_id: str, msg: dict) -> None:
@@ -105,6 +161,9 @@ class Partida:
         if self.estado == "esperando" and not self.jugadores:
             return        # servidor Ready sin nadie: el reloj de la run aún no corre
         self.tiempo_total += dt
+        self.ticks += 1
+        if self.ticks % TICKS_DECISION_BOTS == 0:
+            self._decidir_bots()
         if self.tiempo_total >= DURACION_MAXIMA:
             self._terminar("derrota", "tiempo agotado")
             return
@@ -243,6 +302,12 @@ class Partida:
     # --- Salidas -------------------------------------------------------------
     def snapshot(self) -> dict:
         """Estado que se transmite a jugadores y espectadores. Vacía los eventos."""
+        datos = self._estado_publico()
+        self.eventos = []
+        return datos
+
+    def _estado_publico(self) -> dict:
+        """Lo que ve cualquier jugador (también los bots). No vacía los eventos."""
         datos = {
             "modo": self.modo, "estado": self.estado,
             "piso": self.piso + 1, "pisos": len(self.pisos),
@@ -257,10 +322,14 @@ class Partida:
                                      "en": round(p["en"], 2), "autor": p["autor"]} for p in self.proyectiles]
         if self.estado == "esperando":
             datos["inicio_en"] = round(max(0.0, self.temporizador), 1)
+            datos["sala"] = self.sala
+            datos["max"] = self.max_jugadores
+            datos["listos"] = sorted(self.listos & set(self.jugadores))
         if self.estado == "mejora":
             datos["ofertas"] = {i: mejoras.describir(o) for i, o in self.ofertas.items()}
             datos["elegir_en"] = round(max(0.0, self.temporizador), 1)
-        self.eventos = []
+        if self.bots:
+            datos["bots"] = sorted(self.bots)
         return datos
 
     def resultado(self) -> dict:
@@ -271,6 +340,8 @@ class Partida:
             "victoria": victoria,
             "pisos_superados": self.piso + (1 if victoria else 0),
             "tiempo_s": round(self.tiempo_combate, 2),
-            "jugadores": sorted(self.jugadores),
+            "jugadores": sorted(j for j in self.jugadores if j not in self.bots),
+            "bots": len(self.bots),             # la tabla de líderes separa las runs con bots
+            "sala": self.sala,
             "motivo": self.motivo_fin,
         }
