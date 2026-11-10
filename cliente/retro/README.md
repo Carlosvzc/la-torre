@@ -45,8 +45,15 @@ Cooperativo: varias pestañas o PCs en la misma red (cambia `localhost` por la I
   snapshots que ya llegaron y con horas regulares. Los eventos (golpes, números, sonidos) se disparan
   cuando su snapshot llega a la pantalla. Prueba controlada (caballero a 5 u/s, red con la
   irregularidad medida, 60 fps): velocidad dibujada **4.9–5.0 u/s** (antes 2.5–8.1 u/s).
-- **Poses amortiguadas:** cada articulación se acerca a su pose con un resorte (rápido en el tajo,
-  lento en la capa); retroceso al recibir golpes, polvo al pisar, golpe seco del jefe.
+- **Resortes de segundo orden:** cada articulación arranca suave, acelera y se asienta con un leve
+  rebote. Da peso y más "cuadros intermedios" **sin cambiar la duración** de cada gesto (la fija el servidor).
+- **Esqueleto articulado:** el caballero tiene rodillas, codos, torso, cuello y una capa de 3
+  segmentos en cadena; los jefes, piernas que caminan (el Sabueso en pares diagonales) y cabeza que
+  sigue al caballero.
+- **Fotogramas clave:** el tajo (0.55 s) tiene anticipación, carga, estocada, seguimiento y regreso,
+  con **estela de la espada**; la voltereta (0.4 s) se agacha, rueda y aterriza con polvo; la muerte
+  dobla primero las rodillas. Los jefes bajan el arma antes de alzarla y rebotan tras el golpe.
+- Respiración y cambio de peso en guardia, cabeza estable al caminar, tambaleo al recibir golpes.
 
 > Si Docker Desktop está abierto y existe un contenedor viejo del servidor publicando el puerto
 > 7654, se queda con `localhost` y el cliente habla con código antiguo. Revisa con

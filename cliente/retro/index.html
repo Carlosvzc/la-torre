@@ -425,52 +425,89 @@ function actualizarOndas(dt) {
 //  El caballero (low-poly, generado por código)
 // =====================================================================================
 function crearCaballero(color) {
+  // Jerarquía: raiz → giro (cintura, para la voltereta) → cuerpo → piernas (muslo → rodilla)
+  //                                                             → pecho (torso) → cuello, brazos (hombro → codo), capa
   const raiz = new THREE.Group(), giro = new THREE.Group(), cuerpo = new THREE.Group();
-  giro.position.y = 0.6; cuerpo.position.y = -0.6;            // rueda alrededor de la cintura
+  giro.position.y = 0.6; cuerpo.position.y = -0.6;
   raiz.add(giro); giro.add(cuerpo);
   const acero = mat(0xaab0b8, { map: texMetal, shininess: 40, specular: 0x555555 });
   const tinte = mat(color, { map: texTela });
   const oscuro = mat(0x24202a);
   const hoja = mat(0xd8dde4, { shininess: 90, specular: 0xaaaaaa, emissive: 0x111418 });
-  const mats = [acero, tinte, oscuro, hoja];
+  const capaMat = mat(new THREE.Color(color).multiplyScalar(0.55).getHex(), { map: texTela, side: THREE.DoubleSide });
+  const mats = [acero, tinte, oscuro, hoja, capaMat];
 
-  const piernaI = new THREE.Group(), piernaD = new THREE.Group();
-  piernaI.position.set(-0.13, 0.55, 0); piernaD.position.set(0.13, 0.55, 0);
-  for (const p of [piernaI, piernaD]) {
-    pieza(new THREE.BoxGeometry(0.17, 0.5, 0.2), acero, 0, -0.27, 0, p);
-    pieza(new THREE.BoxGeometry(0.19, 0.08, 0.28), oscuro, 0, -0.52, 0.04, p);
-    cuerpo.add(p);
-  }
-  pieza(new THREE.CylinderGeometry(0.31, 0.31, 0.09, 6), oscuro, 0, 0.6, 0, cuerpo);
-  pieza(new THREE.CylinderGeometry(0.25, 0.3, 0.55, 6), acero, 0, 0.88, 0, cuerpo);
-  pieza(new THREE.BoxGeometry(0.34, 0.55, 0.06), tinte, 0, 0.78, 0.27, cuerpo);
-  const cabeza = pieza(new THREE.CylinderGeometry(0.18, 0.21, 0.32, 6), acero, 0, 1.33, 0, cuerpo);
+  // Piernas con rodilla
+  const piernas = [-1, 1].map((s) => {
+    const muslo = new THREE.Group(); muslo.position.set(s * 0.13, 0.56, 0); cuerpo.add(muslo);
+    pieza(new THREE.BoxGeometry(0.17, 0.29, 0.2), acero, 0, -0.14, 0, muslo);
+    const rodilla = new THREE.Group(); rodilla.position.y = -0.28; muslo.add(rodilla);
+    pieza(new THREE.BoxGeometry(0.15, 0.24, 0.18), acero, 0, -0.12, 0, rodilla);
+    pieza(new THREE.BoxGeometry(0.16, 0.07, 0.06), acero, 0, 0, 0.09, rodilla);        // rodillera
+    pieza(new THREE.BoxGeometry(0.19, 0.08, 0.28), oscuro, 0, -0.25, 0.04, rodilla);   // bota
+    return { muslo, rodilla };
+  });
+
+  // Torso (gira y se inclina por separado de las piernas)
+  const pecho = new THREE.Group(); pecho.position.y = 0.62; cuerpo.add(pecho);
+  pieza(new THREE.CylinderGeometry(0.31, 0.31, 0.09, 6), oscuro, 0, -0.02, 0, pecho);
+  pieza(new THREE.CylinderGeometry(0.25, 0.3, 0.55, 6), acero, 0, 0.26, 0, pecho);
+  pieza(new THREE.BoxGeometry(0.34, 0.55, 0.06), tinte, 0, 0.16, 0.27, pecho);
+  const cuello = new THREE.Group(); cuello.position.y = 0.55; pecho.add(cuello);
+  const cabeza = pieza(new THREE.CylinderGeometry(0.18, 0.21, 0.32, 6), acero, 0, 0.16, 0, cuello);
   pieza(new THREE.BoxGeometry(0.28, 0.04, 0.06), mat(0x050505), 0, 0.02, 0.18, cabeza);
   const penacho = pieza(new THREE.ConeGeometry(0.07, 0.4, 4), tinte, 0, 0.3, -0.06, cabeza);
   penacho.rotation.x = -0.5;
-  for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.2, 0.13, 0.28), acero, s * 0.33, 1.12, 0, cuerpo);
+  for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.2, 0.13, 0.28), acero, s * 0.33, 0.5, 0, pecho);
 
-  const brazoD = new THREE.Group(); brazoD.position.set(0.37, 1.07, 0); cuerpo.add(brazoD);
-  pieza(new THREE.BoxGeometry(0.12, 0.42, 0.14), acero, 0, -0.2, 0, brazoD);
-  const espada = new THREE.Group(); espada.position.set(0, -0.42, 0.04); espada.rotation.x = Math.PI / 2; brazoD.add(espada);
+  // Brazos con codo; la espada va en la mano derecha y el escudo en el antebrazo izquierdo
+  const brazo = (s) => {
+    const hombro = new THREE.Group(); hombro.position.set(s * 0.37, 0.45, 0); pecho.add(hombro);
+    pieza(new THREE.BoxGeometry(0.12, 0.23, 0.14), acero, 0, -0.11, 0, hombro);
+    const codo = new THREE.Group(); codo.position.y = -0.22; hombro.add(codo);
+    pieza(new THREE.BoxGeometry(0.11, 0.21, 0.13), acero, 0, -0.1, 0, codo);
+    const mano = new THREE.Group(); mano.position.y = -0.21; codo.add(mano);
+    return { hombro, codo, mano };
+  };
+  const brazoD = brazo(1), brazoI = brazo(-1);
+  const espada = new THREE.Group(); espada.position.set(0, 0, 0.04); espada.rotation.x = Math.PI / 2; brazoD.mano.add(espada);
   pieza(new THREE.BoxGeometry(0.045, 0.16, 0.045), oscuro, 0, 0, 0, espada);
   pieza(new THREE.BoxGeometry(0.28, 0.045, 0.07), acero, 0, 0.09, 0, espada);
   pieza(new THREE.BoxGeometry(0.075, 0.95, 0.02), hoja, 0, 0.58, 0, espada);
   pieza(new THREE.ConeGeometry(0.038, 0.12, 4), hoja, 0, 1.11, 0, espada);
-
-  const brazoI = new THREE.Group(); brazoI.position.set(-0.37, 1.07, 0); cuerpo.add(brazoI);
-  pieza(new THREE.BoxGeometry(0.12, 0.42, 0.14), acero, 0, -0.2, 0, brazoI);
-  const escudo = pieza(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 6), tinte, -0.05, -0.28, 0.16, brazoI);
+  const punta = new THREE.Object3D(); punta.position.y = 1.15; espada.add(punta);      // para la estela
+  const base = new THREE.Object3D(); base.position.y = 0.35; espada.add(base);
+  const escudo = pieza(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 6), tinte, -0.05, -0.08, 0.16, brazoI.codo);
   escudo.rotation.x = Math.PI / 2;
   pieza(new THREE.CylinderGeometry(0.33, 0.33, 0.04, 6), acero, 0, -0.02, 0, escudo);
 
-  const capa = new THREE.Group(); capa.position.set(0, 1.17, -0.27); cuerpo.add(capa);
-  const capaMat = mat(new THREE.Color(color).multiplyScalar(0.55).getHex(), { map: texTela, side: THREE.DoubleSide });
-  pieza(new THREE.PlaneGeometry(0.62, 0.95, 1, 3), capaMat, 0, -0.47, 0, capa);
-  mats.push(capaMat);
+  // Capa en 3 segmentos encadenados: cada uno sigue al anterior con retraso (movimiento secundario)
+  const capa = [];
+  let ancla = new THREE.Group(); ancla.position.set(0, 0.55, -0.27); pecho.add(ancla);
+  for (let i = 0; i < 3; i++) {
+    const seg = new THREE.Group();
+    if (i > 0) seg.position.y = -0.32;
+    ancla.add(seg);
+    pieza(new THREE.PlaneGeometry(0.62 - i * 0.04, 0.33), capaMat, 0, -0.16, 0, seg);
+    capa.push(seg); ancla = seg;
+  }
+
+  // Estela de la espada: una cinta que sigue la hoja durante el tajo
+  const N = 14;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(N * 2 * 3), 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(N * 2 * 3), 3));
+  const indices = [];
+  for (let i = 0; i < N - 1; i++) { const a = i * 2; indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  geo.setIndex(indices);
+  const estela = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, side: THREE.DoubleSide,
+    depthWrite: false, blending: THREE.AdditiveBlending }));
+  estela.frustumCulled = false;
+  raiz.add(estela);
 
   raiz.add(sombraRedonda(0.5));
-  return { raiz, giro, cuerpo, piernaI, piernaD, brazoD, brazoI, capa, mats, tipo: "caballero" };
+  return { raiz, giro, cuerpo, pecho, cuello, piernas, brazoD, brazoI, capa, punta, base,
+           estela: { malla: estela, puntos: [], N }, mats, tipo: "caballero" };
 }
 
 // =====================================================================================
@@ -479,18 +516,27 @@ function crearCaballero(color) {
 function crearJefe(id) {
   const raiz = new THREE.Group(), giro = new THREE.Group(); raiz.add(giro);
   const arma = new THREE.Group();          // la pieza que se alza al preparar un ataque
-  const ojos = [], mats = [];
+  const ojos = [], mats = [], piernas = [];
+  let cabeza = null, capa = null, cuadrupedo = false;
   const m = (color, extra) => { const x = mat(color, extra); mats.push(x); return x; };
   const brillo = (color) => { const x = new THREE.MeshBasicMaterial({ color }); ojos.push(x); return x; };
+  // pierna articulada en la cadera: la caja cuelga del pivote para poder caminar
+  const pierna = (x, z, alto, ancho, fondo, material) => {
+    const p = new THREE.Group(); p.position.set(x, alto, z); giro.add(p);
+    pieza(new THREE.BoxGeometry(ancho, alto, fondo), material, 0, -alto / 2, 0, p);
+    piernas.push(p); return p;
+  };
+  const cuello = (y, z = 0) => { const c = new THREE.Group(); c.position.set(0, y, z); giro.add(c); cabeza = c; return c; };
   let reposo = -0.3, alzado = -3.3, golpe = -0.6;   // ángulos del arma (eje X)
 
-  if (id === "guardian") {                         // Guardián de Hierro: golem acorazado con martillo
+  if (id === "guardian") {                         // Guardián de Hierro: gólem acorazado con martillo
     const hierro = m(0x7a6250, { map: texMetal, shininess: 30 }), oscuro = m(0x2c2522);
-    for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.38, 0.85, 0.42), hierro, s * 0.35, 0.42, 0, giro);
+    for (const s of [-1, 1]) pierna(s * 0.35, 0, 0.85, 0.38, 0.42, hierro);
     pieza(new THREE.BoxGeometry(1.35, 1.0, 0.85), hierro, 0, 1.35, 0, giro);
     pieza(new THREE.BoxGeometry(1.0, 0.6, 0.12), oscuro, 0, 1.4, 0.45, giro);
-    const cabeza = pieza(new THREE.BoxGeometry(0.48, 0.42, 0.48), hierro, 0, 2.06, 0.05, giro);
-    pieza(new THREE.BoxGeometry(0.36, 0.06, 0.05), brillo(0xff7a1a), 0, 0, 0.25, cabeza);
+    const c = cuello(1.85, 0.05);
+    pieza(new THREE.BoxGeometry(0.48, 0.42, 0.48), hierro, 0, 0.21, 0, c);
+    pieza(new THREE.BoxGeometry(0.36, 0.06, 0.05), brillo(0xff7a1a), 0, 0.21, 0.25, c);
     for (const s of [-1, 1]) {
       const h = pieza(new THREE.BoxGeometry(0.6, 0.36, 0.75), hierro, s * 0.88, 1.8, 0, giro); h.rotation.z = s * -0.2;
     }
@@ -502,9 +548,10 @@ function crearJefe(id) {
     pieza(new THREE.BoxGeometry(0.7, 0.5, 0.5), hierro, 0, 1.45, 0, martillo);
   } else if (id === "bruja") {                     // Bruja de Ceniza: túnica flotante y báculo ardiente
     const ceniza = m(0x4d464c, { map: texTela }), oscuro = m(0x16121a);
-    pieza(new THREE.ConeGeometry(0.8, 1.9, 7), ceniza, 0, 0.95, 0, giro);
+    capa = pieza(new THREE.ConeGeometry(0.8, 1.9, 7), ceniza, 0, 0.95, 0, giro);        // la túnica se mece
     pieza(new THREE.CylinderGeometry(0.33, 0.55, 0.45, 7), ceniza, 0, 1.75, 0, giro);
-    const capucha = pieza(new THREE.ConeGeometry(0.34, 0.7, 6), ceniza, 0, 2.2, -0.04, giro);
+    const c = cuello(1.95, -0.04);
+    const capucha = pieza(new THREE.ConeGeometry(0.34, 0.7, 6), ceniza, 0, 0.25, 0, c);
     pieza(new THREE.BoxGeometry(0.26, 0.26, 0.06), oscuro, 0, -0.18, 0.2, capucha);
     for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.05, 0.03, 0.03), brillo(0xff9a3a), s * 0.06, -0.14, 0.24, capucha);
     arma.position.set(0.5, 1.6, 0.1);
@@ -514,11 +561,12 @@ function crearJefe(id) {
     const luz = new THREE.PointLight(0xff7a2a, 6, 7, 1.6); luz.position.set(0, 1.15, 0.15); arma.add(luz);
     reposo = 0; alzado = -1.4; golpe = 0.5;
   } else if (id === "sabueso") {                   // Sabueso Abismal: bestia de cuatro patas
+    cuadrupedo = true;
     const piel = m(0x2b2238, { map: texTela }), hueso = m(0xb8ad98);
     pieza(new THREE.BoxGeometry(0.85, 0.62, 1.6), piel, 0, 0.85, 0, giro);
     for (let k = 0; k < 5; k++) { const p = pieza(new THREE.ConeGeometry(0.08, 0.35, 4), hueso, 0, 1.25, -0.6 + k * 0.3, giro); p.rotation.x = -0.4; }
-    for (const [x, z] of [[-0.3, 0.6], [0.3, 0.6], [-0.3, -0.6], [0.3, -0.6]]) pieza(new THREE.BoxGeometry(0.18, 0.7, 0.2), piel, x, 0.35, z, giro);
-    const cola = pieza(new THREE.ConeGeometry(0.08, 0.8, 4), piel, 0, 1.0, -1.1, giro); cola.rotation.x = -1.9;
+    for (const [x, z] of [[-0.3, 0.6], [0.3, -0.6], [0.3, 0.6], [-0.3, -0.6]]) pierna(x, z, 0.7, 0.18, 0.2, piel);  // pares diagonales
+    capa = pieza(new THREE.ConeGeometry(0.08, 0.8, 4), piel, 0, 1.0, -1.1, giro); capa.rotation.x = -1.9;      // la cola
     arma.position.set(0, 1.05, 0.85);              // la cabeza hace de "arma"
     const craneo = pieza(new THREE.ConeGeometry(0.32, 0.8, 5), hueso, 0, 0, 0.35, arma); craneo.rotation.x = Math.PI / 2;
     for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.07, 0.05, 0.05), brillo(0xa66bff), s * 0.13, 0.1, 0.35, arma);
@@ -526,13 +574,16 @@ function crearJefe(id) {
     reposo = 0; alzado = -0.5; golpe = 0.35;
   } else if (id === "rey") {                       // Rey sin Corona: espadón y corona rota
     const oro = m(0x7f6a38, { map: texMetal, shininess: 50 }), palido = m(0xb6ab9b), capaM = m(0x4a0f14, { map: texTela, side: THREE.DoubleSide });
-    for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.22, 1.15, 0.26), oro, s * 0.2, 0.58, 0, giro);
+    for (const s of [-1, 1]) pierna(s * 0.2, 0, 1.15, 0.22, 0.26, oro);
     pieza(new THREE.CylinderGeometry(0.38, 0.27, 0.95, 6), oro, 0, 1.6, 0, giro);
-    pieza(new THREE.PlaneGeometry(0.9, 1.9, 1, 3), capaM, 0, 1.2, -0.32, giro);
-    const cabeza = pieza(new THREE.CylinderGeometry(0.17, 0.2, 0.36, 6), palido, 0, 2.3, 0, giro);
+    const ancla = new THREE.Group(); ancla.position.set(0, 2.1, -0.32); giro.add(ancla);
+    pieza(new THREE.PlaneGeometry(0.9, 1.9, 1, 3), capaM, 0, -0.95, 0, ancla);
+    capa = ancla;
+    const c = cuello(2.12);
+    const cab = pieza(new THREE.CylinderGeometry(0.17, 0.2, 0.36, 6), palido, 0, 0.18, 0, c);
     for (let k = 0; k < 7; k++) {                  // corona incompleta: faltan dos puntas
       if (k === 2 || k === 5) continue;
-      const a = (k / 7) * Math.PI * 2, p = pieza(new THREE.ConeGeometry(0.04, 0.2, 4), oro, Math.sin(a) * 0.19, 0.25, Math.cos(a) * 0.19, cabeza);
+      const a = (k / 7) * Math.PI * 2, p = pieza(new THREE.ConeGeometry(0.04, 0.2, 4), oro, Math.sin(a) * 0.19, 0.25, Math.cos(a) * 0.19, cab);
       p.rotation.z = k === 4 ? 0.5 : 0;
     }
     for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.26, 0.15, 0.32), oro, s * 0.45, 2.05, 0, giro);
@@ -545,12 +596,14 @@ function crearJefe(id) {
     pieza(new THREE.BoxGeometry(0.03, 1.7, 0.05), brillo(0x8a1a1a), 0, 1.05, 0, espadon);
   } else {                                         // Coloso del Eclipse (jefe del día)
     const roca = m(0x5d5960, { map: texturaLadrillo(1) }), negro = new THREE.MeshBasicMaterial({ color: 0x000000 });
-    for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.5, 1.0, 0.55), roca, s * 0.45, 0.5, 0, giro);
+    for (const s of [-1, 1]) pierna(s * 0.45, 0, 1.0, 0.5, 0.55, roca);
     pieza(new THREE.BoxGeometry(1.6, 1.3, 1.0), roca, 0, 1.65, 0, giro);
-    const cabeza = pieza(new THREE.DodecahedronGeometry(0.38, 0), roca, 0, 2.6, 0.05, giro);
-    pieza(new THREE.BoxGeometry(0.4, 0.06, 0.05), brillo(0xff3a2a), 0, 0.02, 0.35, cabeza);
+    const c = cuello(2.3, 0.05);
+    const cab = pieza(new THREE.DodecahedronGeometry(0.38, 0), roca, 0, 0.3, 0, c);
+    pieza(new THREE.BoxGeometry(0.4, 0.06, 0.05), brillo(0xff3a2a), 0, 0.02, 0.35, cab);
     const halo = pieza(new THREE.TorusGeometry(0.95, 0.07, 6, 28), brillo(0xff6a2a), 0, 2.75, -0.55, giro);
     pieza(new THREE.CircleGeometry(0.88, 28), negro, 0, 0, -0.02, halo);
+    capa = halo;                                   // el halo gira despacio
     pieza(new THREE.BoxGeometry(0.45, 1.1, 0.45), roca, -1.05, 1.5, 0, giro);
     arma.position.set(1.05, 2.1, 0);
     pieza(new THREE.BoxGeometry(0.45, 1.0, 0.45), roca, 0, -0.5, 0, arma);
@@ -560,7 +613,7 @@ function crearJefe(id) {
   giro.add(arma);
   raiz.add(sombraRedonda(1));
   arma.rotation.x = reposo;
-  return { raiz, giro, arma, ojos, mats, reposo, alzado, golpe, tipo: id };
+  return { raiz, giro, arma, ojos, mats, piernas, cabeza, capa, cuadrupedo, reposo, alzado, golpe, tipo: id };
 }
 
 // =====================================================================================
@@ -952,128 +1005,250 @@ function sonido(tipo) {
 // =====================================================================================
 //  Animación de cada cuadro
 // =====================================================================================
-// Cada articulación se acerca a su pose objetivo con un resorte amortiguado (k = rapidez):
-// así las transiciones entre estados (caminar, tajo, voltereta, golpe recibido) nunca saltan.
+// --- Herramientas de animación ---------------------------------------------------------------
+// Primer orden (para suavizar medidas como la velocidad): se acerca exponencialmente.
 const amortiguar = (valor, objetivo, k, dt) => valor + (objetivo - valor) * (1 - Math.exp(-k * dt));
+// Resorte de segundo orden: arranca suave, acelera y se asienta (con un leve rebote si z < 1).
+// Da sensación de peso y de más cuadros intermedios SIN cambiar cuánto dura cada gesto.
+function resorte(r, clave, objetivo, dt, w = 18, z = 0.8) {
+  let s = r[clave];
+  if (!s) s = r[clave] = { x: objetivo, v: 0 };
+  const pasos = Math.max(1, Math.ceil(dt / (1 / 240)));        // sub-pasos: estable a cualquier fps
+  const h = dt / pasos;
+  for (let i = 0; i < pasos; i++) {
+    s.v += (w * w * (objetivo - s.x) - 2 * z * w * s.v) * h;
+    s.x += s.v * h;
+  }
+  return s.x;
+}
+// Fotogramas clave [[t, valor], ...] con transición suave (entrada y salida) entre cada par.
+function claves(t, kf) {
+  if (t <= kf[0][0]) return kf[0][1];
+  for (let i = 1; i < kf.length; i++) {
+    if (t <= kf[i][0]) { const [ta, va] = kf[i - 1], [tb, vb] = kf[i]; return lerp(va, vb, suave((t - ta) / (tb - ta))); }
+  }
+  return kf[kf.length - 1][1];
+}
+const angulo = (a) => ((a % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI;   // a [-π, π]
+const v1 = new THREE.Vector3(), v2 = new THREE.Vector3();
 
 function animarCaballero(c, ja, jb, alfa, ahora, dt) {
-  const m = c.modelo;
+  const m = c.modelo, r = c.r || (c.r = {});
   const x = lerp(ja.x, jb.x, alfa), y = lerp(ja.y, jb.y, alfa);
   const velocidad = Math.hypot(x - c.x, y - c.y) / Math.max(dt, 1e-3);
   c.x = x; c.y = y;
-  c.vel = amortiguar(c.vel, ja.estado === "esquivando" ? 0 : velocidad, 10, dt);
+  const velPrevia = c.vel;
+  c.vel = amortiguar(c.vel, ja.estado === "esquivando" ? 0 : Math.min(velocidad, 8), 8, dt);
+  const acel = (c.vel - velPrevia) / Math.max(dt, 1e-3);
   m.raiz.position.copy(mundo(x, y));
   const dx = lerp(ja.dx, jb.dx, alfa), dy = lerp(ja.dy, jb.dy, alfa);
-  if (Math.abs(dx) + Math.abs(dy) > 1e-3) c.giro = lerpAngulo(c.giro, giroHacia(dx, dy), 1 - Math.exp(-dt * 16));
+  const giroAntes = c.giro;
+  if (Math.abs(dx) + Math.abs(dy) > 1e-3) c.giro = lerpAngulo(c.giro, giroHacia(dx, dy), 1 - Math.exp(-dt * 12));
+  const velGiro = angulo(c.giro - giroAntes) / Math.max(dt, 1e-3);
   m.raiz.rotation.y = c.giro;
 
-  const t = (ahora - c.tEstado) / 1000;
-  const paso = limitar(c.vel / 5, 0, 1);
+  const t = (ahora - c.tEstado) / 1000, s = ahora / 1000;
+  const A = limitar(c.vel / 5, 0, 1);                     // 0 = quieto, 1 = caminando a velocidad normal
   const fasePrevia = c.fase;
-  c.fase += dt * (3 + 9 * paso);
-  if (paso > 0.5 && Math.floor(fasePrevia / Math.PI) !== Math.floor(c.fase / Math.PI)) {
-    particulas.emitir(mundo(x, y, 0.05), 2, 0x5a5048, 0.6, { gravedad: 1, vida: 0.5 });   // polvo al pisar
+  c.fase += dt * (2 + 9 * A);                             // la zancada sigue a la velocidad real
+  if (A > 0.4 && Math.floor(fasePrevia / Math.PI) !== Math.floor(c.fase / Math.PI)) {
+    particulas.emitir(mundo(x, y, 0.05), 3, 0x5a5048, 0.7, { gravedad: 1, vida: 0.55, radio: 0.2 });   // pisada
   }
-  c.golpe = Math.max(0, c.golpe - dt * 4);
+  if (c.estAnim === "esquivando" && ja.estado !== "esquivando") {                                       // aterrizaje
+    particulas.emitir(mundo(x, y, 0.05), 12, 0x6a6058, 1.4, { gravedad: 2, vida: 0.6, radio: 0.4 });
+  }
+  c.estAnim = ja.estado;
+  c.golpe = Math.max(0, c.golpe - dt * 3);
+  const g = c.golpe;
+  let mirar = 0;                                          // la cabeza busca al jefe
+  if (jefeVista) mirar = limitar(angulo(giroHacia(jefeVista.x - x, jefeVista.y - y) - c.giro), -0.8, 0.8);
 
-  // Pose objetivo: respirar, caminar e inclinarse al correr
-  const pose = {
-    rotX: 0.1 * paso - 0.4 * c.golpe, rotY: 0,
-    alto: 0.6 + Math.abs(Math.sin(c.fase)) * 0.06 * paso + Math.sin(ahora / 600) * 0.012 - 0.05 * c.golpe,
-    brazoD: -0.35 + Math.sin(c.fase) * 0.25 * paso + Math.sin(ahora / 700) * 0.03,
-    brazoI: -Math.sin(c.fase) * 0.5 * paso,
-    piernaI: Math.sin(c.fase) * 0.75 * paso, piernaD: -Math.sin(c.fase) * 0.75 * paso,
-    capa: 0.12 + paso * 0.6 + Math.sin(ahora / 320) * 0.05 + Math.sin(c.fase * 2) * 0.05 * paso,
+  // ---- Pose base: en guardia (quieto) o caminando --------------------------------------
+  const sf = Math.sin(c.fase), cf = Math.cos(c.fase), resp = Math.sin(s * 1.6), q = 1 - A;
+  const p = {
+    alto: 0.6 - 0.03 * q + A * (0.035 * Math.cos(2 * c.fase) - 0.02) + 0.006 * resp,
+    giroX: 0, giroZ: 0.02 * Math.sin(s * 0.8) * q + 0.045 * A * sf,          // cambio de peso / balanceo
+    pechoX: 0.04 + 0.16 * A + limitar(acel * 0.02, -0.12, 0.12) + 0.02 * resp,  // se inclina al arrancar
+    pechoY: 0.2 * A * sf - 0.15 * q, pechoZ: -0.04 * A * sf,
+    cuelloX: -0.04 * A - 0.015 * resp, cuelloY: mirar * 0.6 - 0.2 * A * sf + 0.15 * q,
+    musloI: -0.62 * A * sf - 0.15 * q, rodillaI: A * (0.1 + 0.8 * Math.max(0, cf)) + 0.15 * q,
+    musloD: 0.62 * A * sf + 0.12 * q, rodillaD: A * (0.1 + 0.8 * Math.max(0, -cf)) + 0.15 * q,
+    hombroD: -0.45 - 0.3 * A * sf + 0.03 * resp, codoD: -0.7 - 0.1 * A,
+    hombroI: 0.45 * A * sf - 0.45 * q, codoI: -0.9 * q - 0.4 * A,
   };
-  let kBrazo = 16, kCuerpo = 12;
-  if (ja.estado === "atacando") {                 // carga 0.28 s, tajo en 0.08 s, recuperación
-    if (t < 0.28) pose.brazoD = lerp(-0.35, -3.6, salida(t / 0.28));
-    else if (t < 0.36) pose.brazoD = lerp(-3.6, -0.6, (t - 0.28) / 0.08);
-    else pose.brazoD = lerp(-0.6, -0.35, limitar((t - 0.36) / 0.2, 0, 1));
-    pose.rotY = t < 0.28 ? -0.35 * salida(t / 0.28) : lerp(-0.35, 0.3, limitar((t - 0.28) / 0.1, 0, 1));
-    pose.rotX = t < 0.28 ? -0.08 : 0.2;           // se echa atrás al cargar y se lanza al tajar
-    pose.piernaI = t < 0.28 ? -0.2 : 0.45; pose.piernaD = t < 0.28 ? 0.2 : -0.3;   // paso adelante
-    kBrazo = 45; kCuerpo = 25;
+  let kBrazo = [22, 0.75], kCuerpo = [16, 0.75], kAlto = [20, 0.7];
+
+  if (ja.estado === "atacando") {
+    // 0–0.10 anticipación (se agacha y gira) · 0.10–0.27 carga sobre la cabeza ·
+    // 0.27–0.33 tajo con estocada · 0.33–0.45 seguimiento · 0.45–0.55 vuelve a la guardia
+    p.hombroD = claves(t, [[0, -0.5], [0.1, -0.9], [0.27, -3.5], [0.33, -0.7], [0.42, -0.25], [0.55, -0.5]]);
+    p.codoD = claves(t, [[0, -0.6], [0.1, -1.0], [0.27, -1.3], [0.31, -0.1], [0.42, -0.2], [0.55, -0.6]]);
+    p.hombroI = claves(t, [[0, -0.3], [0.27, -0.6], [0.33, 0.25], [0.55, -0.35]]);
+    p.codoI = claves(t, [[0, -0.9], [0.27, -1.2], [0.33, -0.5], [0.55, -0.9]]);
+    p.pechoY = claves(t, [[0, 0], [0.1, -0.25], [0.27, -0.55], [0.33, 0.4], [0.42, 0.45], [0.55, 0]]);
+    p.pechoX = claves(t, [[0, 0.05], [0.1, -0.02], [0.27, -0.15], [0.32, 0.32], [0.42, 0.26], [0.55, 0.06]]);
+    p.alto = claves(t, [[0, 0.6], [0.1, 0.54], [0.27, 0.6], [0.32, 0.5], [0.45, 0.52], [0.55, 0.58]]);
+    p.musloI = claves(t, [[0, -0.15], [0.1, -0.05], [0.27, -0.1], [0.32, -0.7], [0.45, -0.55], [0.55, -0.2]]);
+    p.rodillaI = claves(t, [[0, 0.15], [0.1, 0.35], [0.27, 0.2], [0.32, 0.7], [0.45, 0.6], [0.55, 0.2]]);
+    p.musloD = claves(t, [[0, 0.12], [0.1, 0.2], [0.27, 0.15], [0.32, 0.5], [0.45, 0.45], [0.55, 0.15]]);
+    p.rodillaD = claves(t, [[0, 0.15], [0.1, 0.4], [0.32, 0.25], [0.55, 0.2]]);
+    kBrazo = [34, 0.72]; kCuerpo = [26, 0.75]; kAlto = [28, 0.75];
+  } else if (ja.estado === "esquivando") {
+    // agacharse · rodar · aterrizar (0.4 s en total, como en el servidor)
+    p.alto = claves(t, [[0, 0.6], [0.05, 0.45], [0.2, 0.35], [0.33, 0.42], [0.4, 0.52]]);
+    p.musloI = p.musloD = claves(t, [[0, -0.1], [0.05, -1.0], [0.3, -1.2], [0.4, -0.4]]);
+    p.rodillaI = p.rodillaD = claves(t, [[0, 0.2], [0.05, 1.3], [0.3, 1.5], [0.4, 0.7]]);
+    p.hombroD = p.hombroI = -1.0; p.codoD = p.codoI = -1.6; p.pechoX = 0.45; p.pechoY = 0;
+    kAlto = [30, 0.75]; kCuerpo = [26, 0.8];
   } else if (ja.estado === "muerto") {
-    pose.rotX = -Math.PI / 2 * 0.95; pose.alto = 0.18; pose.brazoD = -1.2; pose.brazoI = -1.2;
-    kCuerpo = 7;
+    // se le doblan las rodillas y luego cae de espaldas
+    p.alto = claves(t, [[0, 0.6], [0.3, 0.4], [0.9, 0.18]]);
+    p.giroX = claves(t, [[0, 0], [0.3, 0.25], [0.9, -1.45]]);
+    p.rodillaI = p.rodillaD = claves(t, [[0, 0.1], [0.3, 1.4], [0.9, 0.3]]);
+    p.musloI = p.musloD = claves(t, [[0, 0], [0.3, -0.9], [0.9, -0.1]]);
+    p.hombroD = p.hombroI = claves(t, [[0, -0.4], [0.3, -0.2], [0.9, -2.6]]);
+    p.codoD = p.codoI = -0.2; p.cuelloX = claves(t, [[0, 0], [0.9, 0.4]]); p.pechoX = claves(t, [[0, 0.1], [0.3, 0.35], [0.9, 0]]);
+    kCuerpo = [12, 0.55];
   }
+  // Golpe recibido: tambaleo (los resortes poco amortiguados lo hacen rebotar)
+  p.pechoX -= 0.55 * g; p.cuelloX -= 0.5 * g; p.hombroD += 0.5 * g; p.hombroI += 0.5 * g;
+  p.alto -= 0.08 * g; p.rodillaI += 0.4 * g; p.rodillaD += 0.4 * g;
 
-  if (ja.estado === "esquivando") {               // voltereta: va directa (no se amortigua el giro)
-    const q = suave(limitar(t / 0.4, 0, 1));
-    m.giro.rotation.x = q * Math.PI * 2;
-    m.giro.position.y = 0.6 - Math.sin(q * Math.PI) * 0.32;
-    pose.piernaI = pose.piernaD = -1.2; pose.brazoD = pose.brazoI = -1.0;     // se encoge
+  // ---- Aplicar con resortes ------------------------------------------------------------
+  if (ja.estado === "esquivando") {                     // la vuelta es exacta (dura lo que dice el servidor)
+    m.giro.rotation.x = claves(t, [[0, 0], [0.05, 0.25], [0.33, Math.PI * 2 - 0.15], [0.4, Math.PI * 2]]);
+    r.giroX = { x: m.giro.rotation.x, v: 0 };
   } else {
-    if (m.giro.rotation.x > Math.PI) m.giro.rotation.x -= Math.PI * 2;      // termina la vuelta sin desandarla
-    m.giro.rotation.x = amortiguar(m.giro.rotation.x, pose.rotX, kCuerpo, dt);
-    m.giro.position.y = amortiguar(m.giro.position.y, pose.alto, 14, dt);
+    if (r.giroX && r.giroX.x > Math.PI) r.giroX.x -= Math.PI * 2;      // termina la vuelta sin desandarla
+    m.giro.rotation.x = resorte(r, "giroX", p.giroX, dt, kCuerpo[0], kCuerpo[1]);
   }
-  m.giro.rotation.y = amortiguar(m.giro.rotation.y, pose.rotY, kCuerpo, dt);
-  m.brazoD.rotation.x = amortiguar(m.brazoD.rotation.x, pose.brazoD, kBrazo, dt);
-  m.brazoI.rotation.x = amortiguar(m.brazoI.rotation.x, pose.brazoI, 14, dt);
-  m.piernaI.rotation.x = amortiguar(m.piernaI.rotation.x, pose.piernaI, 18, dt);
-  m.piernaD.rotation.x = amortiguar(m.piernaD.rotation.x, pose.piernaD, 18, dt);
-  m.capa.rotation.x = amortiguar(m.capa.rotation.x, pose.capa, 5, dt);      // la capa va con retraso
+  m.giro.position.y = resorte(r, "alto", p.alto, dt, kAlto[0], kAlto[1]);
+  m.giro.rotation.z = resorte(r, "giroZ", p.giroZ, dt, 10, 0.8);
+  m.pecho.rotation.x = resorte(r, "pechoX", p.pechoX, dt, kCuerpo[0], g > 0.05 ? 0.4 : kCuerpo[1]);
+  m.pecho.rotation.y = resorte(r, "pechoY", p.pechoY, dt, kCuerpo[0], kCuerpo[1]);
+  m.pecho.rotation.z = resorte(r, "pechoZ", p.pechoZ, dt, 14, 0.8);
+  m.cuello.rotation.x = resorte(r, "cuelloX", p.cuelloX, dt, 12, g > 0.05 ? 0.4 : 0.8);
+  m.cuello.rotation.y = resorte(r, "cuelloY", p.cuelloY, dt, 10, 0.85);
+  const [pI, pD] = m.piernas;
+  pI.muslo.rotation.x = resorte(r, "musloI", p.musloI, dt, 24, 0.8);
+  pI.rodilla.rotation.x = resorte(r, "rodillaI", p.rodillaI, dt, 24, 0.8);
+  pD.muslo.rotation.x = resorte(r, "musloD", p.musloD, dt, 24, 0.8);
+  pD.rodilla.rotation.x = resorte(r, "rodillaD", p.rodillaD, dt, 24, 0.8);
+  m.brazoD.hombro.rotation.x = resorte(r, "hombroD", p.hombroD, dt, kBrazo[0], kBrazo[1]);
+  m.brazoD.codo.rotation.x = resorte(r, "codoD", p.codoD, dt, kBrazo[0], kBrazo[1]);
+  m.brazoI.hombro.rotation.x = resorte(r, "hombroI", p.hombroI, dt, 20, 0.75);
+  m.brazoI.codo.rotation.x = resorte(r, "codoI", p.codoI, dt, 20, 0.75);
 
-  c.flash = Math.max(0, c.flash - dt * 5);        // destello rojo al recibir daño
+  // Capa: tres segmentos en cadena, cada uno reacciona al movimiento del anterior
+  const c0 = resorte(r, "capa0", 0.15 + 0.55 * A + 0.06 * Math.sin(s * 2.1) - 0.3 * p.pechoX, dt, 7, 0.45);
+  const c1 = resorte(r, "capa1", 0.06 + 0.25 * A - 0.035 * r.capa0.v, dt, 6, 0.4);
+  const c2 = resorte(r, "capa2", 0.04 + 0.2 * A - 0.035 * r.capa1.v + 0.04 * Math.sin(s * 3.3), dt, 5, 0.4);
+  m.capa[0].rotation.x = c0; m.capa[1].rotation.x = c1; m.capa[2].rotation.x = c2;
+  m.capa[0].rotation.z = resorte(r, "capaZ", limitar(-velGiro * 0.06, -0.5, 0.5), dt, 6, 0.5);
+
+  actualizarEstela(m, ja.estado === "atacando" && t > 0.2 && t < 0.42);
+  c.flash = Math.max(0, c.flash - dt * 5);              // destello rojo al recibir daño
   for (const mt of m.mats) mt.emissive.setRGB(c.flash * 0.7, 0, 0);
 }
 
+// La estela sigue la punta de la espada durante el tajo y luego se desvanece
+function actualizarEstela(m, activa) {
+  const e = m.estela, pts = e.puntos;
+  if (activa) {
+    m.raiz.updateMatrixWorld(true);
+    pts.unshift({ punta: m.raiz.worldToLocal(m.punta.getWorldPosition(v1)).clone(),
+                  base: m.raiz.worldToLocal(m.base.getWorldPosition(v2)).clone() });
+    if (pts.length > e.N) pts.length = e.N;
+  } else if (pts.length) pts.splice(-2, 2);               // se acorta desde la cola: se desvanece
+  const pos = e.malla.geometry.attributes.position, col = e.malla.geometry.attributes.color;
+  for (let i = 0; i < e.N; i++) {
+    const q = pts[Math.min(i, pts.length - 1)];
+    const f = pts.length && i < pts.length ? (1 - i / e.N) * 0.85 : 0;
+    for (const [k, punto] of [[i * 2, q ? q.punta : v1.set(0, -9, 0)], [i * 2 + 1, q ? q.base : v1.set(0, -9, 0)]]) {
+      pos.setXYZ(k, punto.x, punto.y, punto.z);
+      col.setXYZ(k, f, f * 0.9, f * 0.65);
+    }
+  }
+  pos.needsUpdate = true; col.needsUpdate = true;
+}
+
 function animarJefe(jv, ja, jb, alfa, aviso, ahora, dt) {
-  const m = jv.modelo, r = ja.radio;
+  const m = jv.modelo, r = jv.r || (jv.r = {}), radio = ja.radio;
   const x = lerp(ja.x, jb.x, alfa), y = lerp(ja.y, jb.y, alfa);
   const velocidad = Math.hypot(x - jv.x, y - jv.y) / Math.max(dt, 1e-3);
   jv.x = x; jv.y = y;
-  jv.vel = amortiguar(jv.vel, velocidad > 15 ? jv.vel : velocidad, 8, dt);   // ignora el salto de la embestida
+  jv.vel = amortiguar(jv.vel, velocidad > 15 ? jv.vel : velocidad, 6, dt);   // ignora el salto de la embestida
   jv.aparicion = Math.min(1, jv.aparicion + dt / 1.2);
-  m.raiz.position.copy(mundo(x, y, (salida(jv.aparicion) - 1) * 2.5 * r));     // surge del suelo
+  m.raiz.position.copy(mundo(x, y, (salida(jv.aparicion) - 1) * 2.5 * radio));   // surge del suelo
   // mira hacia donde va a golpear, o hacia el caballero más cercano
-  let objetivo = null;
+  let objetivo = null, cercano = null;
+  let mejor = Infinity;
+  for (const c of caballeros.values()) {
+    const d = Math.hypot(c.x - x, c.y - y);
+    if (c.estado !== "muerto" && d < mejor) { mejor = d; cercano = [c.x - x, c.y - y]; }
+  }
   if (aviso && aviso.zonas.length) {
     const [zx, zy] = aviso.zonas[0];
     if (Math.hypot(zx - ja.x, zy - ja.y) > 0.3) objetivo = [zx - ja.x, zy - ja.y];
   }
-  if (!objetivo) {
-    let mejor = Infinity;
-    for (const c of caballeros.values()) {
-      const d = Math.hypot(c.x - x, c.y - y);
-      if (c.estado !== "muerto" && d < mejor) { mejor = d; objetivo = [c.x - x, c.y - y]; }
-    }
-  }
-  if (objetivo && ja.estado !== "recuperando") jv.giro = lerpAngulo(jv.giro, giroHacia(objetivo[0], objetivo[1]), 1 - Math.exp(-dt * 5));
+  objetivo = objetivo || cercano;
+  if (objetivo && ja.estado !== "recuperando") jv.giro = lerpAngulo(jv.giro, giroHacia(objetivo[0], objetivo[1]), 1 - Math.exp(-dt * 4));
   m.raiz.rotation.y = jv.giro;
 
-  const t = (ahora - jv.tEstado) / 1000, paso = limitar(jv.vel / 3, 0, 1);
-  jv.retroceso = Math.max(0, jv.retroceso - dt * 5);
-  const pose = {
-    arma: m.reposo + Math.sin(ahora / 600) * 0.05,
-    rotX: 0.06 * paso - 0.1 * jv.retroceso,
-    alto: Math.abs(Math.sin(ahora / 180)) * 0.08 * paso + (m.tipo === "bruja" ? 0.25 + Math.sin(ahora / 400) * 0.1 : 0),
+  const t = (ahora - jv.tEstado) / 1000, s = ahora / 1000;
+  const A = limitar(jv.vel / 2.5, 0, 1);
+  jv.fase = (jv.fase || 0) + dt * (1.5 + 5 * A);
+  jv.retroceso = Math.max(0, jv.retroceso - dt * 2.5);
+  const mirar = cercano ? limitar(angulo(giroHacia(cercano[0], cercano[1]) - jv.giro), -0.7, 0.7) : 0;
+  const p = {
+    arma: m.reposo + 0.06 * Math.sin(s * 1.4), giroX: 0.05 * A, giroZ: 0.05 * A * Math.sin(jv.fase),
+    alto: (m.tipo === "bruja" ? 0.25 + 0.1 * Math.sin(s * 2.5) : Math.abs(Math.sin(jv.fase)) * 0.06 * A) + 0.01 * Math.sin(s * 1.2),
+    cabezaY: mirar, cabezaX: 0, piernas: 0,
   };
-  let kArma = 8, brilloOjos = 1, rojo = 0;
+  let kArma = [10, 0.85], brilloOjos = 1, rojo = 0;
   if (ja.estado === "preparando" && aviso && avisoVisto) {
-    const p = 1 - limitar(aviso.en / avisoVisto.total, 0, 1);
-    pose.arma = lerp(m.reposo, m.alzado, salida(p));
-    pose.rotX = (m.tipo === "sabueso" ? 0.25 : -0.18) * p;
-    if (m.tipo === "sabueso") pose.alto -= 0.2 * p;
-    brilloOjos = 1 + 3 * p; rojo = p; kArma = 14;
-    // la lluvia de ceniza: meteoros que caen justo antes del impacto
-    if (aviso.ataque.includes("lluvia") && aviso.en < 0.5 && !avisoVisto.meteoros) {
+    // anticipación: el arma baja un poco antes de subir, el cuerpo se agacha y se echa atrás
+    const q = 1 - limitar(aviso.en / avisoVisto.total, 0, 1);
+    p.arma = claves(q, [[0, m.reposo], [0.18, m.reposo + (m.reposo - m.alzado) * 0.1], [0.8, m.alzado], [1, m.alzado + (m.alzado - m.reposo) * 0.04]]);
+    p.giroX = claves(q, [[0, 0], [0.18, 0.06], [1, m.tipo === "sabueso" ? 0.28 : -0.2]]);
+    p.alto -= 0.12 * q; p.cabezaX = -0.12 * q; p.piernas = 0.15 * q;
+    brilloOjos = 1 + 3 * q; rojo = q; kArma = [14, 0.8];
+    if (aviso.ataque.includes("lluvia") && aviso.en < 0.5 && !avisoVisto.meteoros) {   // meteoros de ceniza
       avisoVisto.meteoros = true;
       for (const [zx, zy] of aviso.zonas) particulas.emitir(mundo(zx, zy, 7), 30, 0xff8a2a, 0.6, { radio: 0.6, gravedad: 30, subir: -1, vida: 0.7 });
     }
-  } else if (ja.estado === "recuperando") {        // golpe seco y luego se recupera despacio
-    pose.arma = lerp(m.golpe, m.reposo, limitar((t - 0.15) / 0.8, 0, 1));
-    pose.rotX = 0.15 * (1 - limitar(t / 0.9, 0, 1));
-    kArma = t < 0.12 ? 40 : 10;
-  } else if (ja.estado === "muerto") {
-    pose.rotX = 0;
+  } else if (ja.estado === "recuperando") {
+    // golpe seco con rebote, luego una recuperación lenta y pesada
+    p.arma = t < 0.12 ? m.golpe : lerp(m.golpe, m.reposo, suave(limitar((t - 0.25) / 0.7, 0, 1)));
+    p.giroX = claves(t, [[0, 0.22], [0.3, 0.18], [1, 0]]);
+    p.alto += claves(t, [[0, -0.1], [1, 0]]); p.cabezaX = claves(t, [[0, 0.15], [1, 0]]);
+    kArma = t < 0.12 ? [40, 0.45] : [6, 0.9];
   }
-  m.arma.rotation.x = amortiguar(m.arma.rotation.x, pose.arma, kArma, dt);
-  m.giro.rotation.x = amortiguar(m.giro.rotation.x, pose.rotX, 10, dt);
-  m.giro.position.y = amortiguar(m.giro.position.y, pose.alto, 10, dt);
-  m.giro.scale.set(1 + 0.03 * jv.retroceso, (1 + Math.sin(ahora / 450) * 0.02) * (1 - 0.05 * jv.retroceso), 1 + 0.03 * jv.retroceso);
+  p.giroX -= 0.14 * jv.retroceso;                        // golpe recibido
+
+  m.arma.rotation.x = resorte(r, "arma", p.arma, dt, kArma[0], kArma[1]);
+  m.giro.rotation.x = resorte(r, "giroX", p.giroX, dt, 10, jv.retroceso > 0.05 ? 0.4 : 0.65);
+  m.giro.rotation.z = resorte(r, "giroZ", p.giroZ, dt, 6, 0.7);
+  m.giro.position.y = resorte(r, "alto", p.alto, dt, 10, 0.7);
+  m.giro.scale.set(1 + 0.03 * jv.retroceso, (1 + Math.sin(s * 2.2) * 0.02) * (1 - 0.05 * jv.retroceso), 1 + 0.03 * jv.retroceso);
+  if (m.cabeza) {
+    m.cabeza.rotation.y = resorte(r, "cabezaY", p.cabezaY, dt, 6, 0.85);
+    m.cabeza.rotation.x = resorte(r, "cabezaX", p.cabezaX, dt, 8, 0.8);
+  }
+  // Piernas: pasos alternos (el Sabueso mueve las patas en pares diagonales)
+  const paso = Math.sin(jv.fase) * (m.cuadrupedo ? 0.6 : 0.5) * A;
+  m.piernas.forEach((pierna, i) => {
+    const signo = m.cuadrupedo ? (i < 2 ? 1 : -1) : (i === 0 ? 1 : -1);
+    pierna.rotation.x = resorte(r, "pierna" + i, signo * paso, dt, 16, 0.8);
+    pierna.rotation.z = resorte(r, "piernaZ" + i, (i % 2 ? -1 : 1) * p.piernas, dt, 10, 0.8);   // abre las piernas al cargar
+  });
+  // Partes que se mecen solas: túnica, capa, cola y halo
+  if (m.capa) {
+    if (m.tipo === "bruja") { m.capa.rotation.z = 0.05 * Math.sin(s * 1.3); m.capa.rotation.x = resorte(r, "tunica", 0.08 * A, dt, 5, 0.5); }
+    else if (m.tipo === "rey") m.capa.rotation.x = resorte(r, "capa", 0.1 + 0.4 * A + 0.05 * Math.sin(s * 1.7) + 0.2 * jv.retroceso, dt, 6, 0.45);
+    else if (m.tipo === "sabueso") m.capa.rotation.z = 0.4 * Math.sin(s * (3 + 4 * A));
+    else m.capa.rotation.z += dt * 0.3;
+  }
   jv.flash = Math.max(0, jv.flash - dt * 8);
   for (const mt of m.mats) {
     if (jv.flash > 0) mt.emissive.setRGB(jv.flash * 0.8, jv.flash * 0.8, jv.flash * 0.75);
