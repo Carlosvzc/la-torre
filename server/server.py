@@ -49,6 +49,9 @@ JUGADORES = Gauge("torre_players_connected", "Jugadores conectados")
 ESPECTADORES = Gauge("torre_spectators_connected", "Espectadores conectados")
 TICK = Histogram("torre_tick_seconds", "Duración del tick (simulación + envío)",
                  buckets=(.0005, .001, .0025, .005, .01, .025, .05, .1))
+RETRASO = Histogram("torre_tick_lag_seconds",
+                    "Cuánto empieza tarde cada tick respecto a su horario (bucle de eventos ocupado)",
+                    buckets=(.001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5))
 BYTES = Counter("torre_bytes_sent_total", "Bytes enviados a los clientes", ["rol"])
 MENSAJES = Counter("torre_messages_received_total", "Mensajes recibidos de los clientes")
 RECHAZADOS = Counter("torre_messages_rejected_total", "Mensajes que provocaron un error y se ignoraron")
@@ -95,6 +98,8 @@ class Servidor:
         self.con_agones = False
         self.asignado = False          # ya se llamó a /allocate en esta run
         self.latiendo = False          # hay un /health en curso
+        self.terminando = False        # la run acabó y se está cerrando (pantalla final)
+        self.tareas: set[asyncio.Task] = set()   # referencias para que asyncio no las pierda
         self.cerrando = False
         self.n_tick = 0
         self.eventos_espectador: list[dict] = []
@@ -118,11 +123,19 @@ class Servidor:
         if not jugador_id:
             await ws.close(code=4002, reason="falta el id del jugador")
             return
-        if self.cerrando or len(self.jugadores) >= MAX_JUGADORES:
+        # Códigos de rechazo (el cliente los muestra y Locust los reporta tal cual):
+        #   4000 partida llena · 4001 la run ya empezó · 4003 la run está terminando · 4004 id repetido
+        if self.cerrando or self.terminando or self.partida.terminada:
+            await ws.close(code=4003, reason="la run está terminando; intenta en unos segundos")
+            return
+        if len(self.jugadores) >= MAX_JUGADORES:
             await ws.close(code=4000, reason="partida llena")
             return
+        if jugador_id in self.partida.jugadores:
+            await ws.close(code=4004, reason="ese id ya está en la partida")
+            return
         if not self.partida.agregar_jugador(jugador_id):
-            await ws.close(code=4001, reason="la run ya empezó o el id está repetido")
+            await ws.close(code=4001, reason="la run ya empezó")
             return
 
         self.jugadores[jugador_id] = ws
@@ -226,6 +239,13 @@ class Servidor:
                 await ws.close(code=1000, reason="fin de la run")
             self.partida = Partida(modo=self.modo, semilla=self.semilla)
             self.asignado = False
+        self.terminando = False
+
+    def en_segundo_plano(self, coro) -> None:
+        """Lanza una tarea sin frenar el tick y guarda su referencia hasta que termine."""
+        tarea = asyncio.get_running_loop().create_task(coro)
+        self.tareas.add(tarea)
+        tarea.add_done_callback(self.tareas.discard)
 
     async def _latir(self) -> None:
         try:
@@ -237,19 +257,25 @@ class Servidor:
         siguiente = time.perf_counter()
         while not self.cerrando:
             t = time.perf_counter()
+            RETRASO.observe(max(0.0, t - siguiente))      # tick rate efectivo (práctica 3.4)
             self.tick()
             TICK.observe(time.perf_counter() - t)
             if self.n_tick % LATIDO_TICKS == 0 and self.con_agones and not self.latiendo:
                 # El latido va en segundo plano: si el SDK tarda, la partida no se congela
                 self.latiendo = True
-                asyncio.get_running_loop().create_task(self._latir())
-            if self.partida.terminada:
-                await self.terminar_run()
+                self.en_segundo_plano(self._latir())
+            if self.partida.terminada and not self.terminando:
+                # El cierre (reporte, pantalla final, /shutdown) va aparte: los ticks siguen,
+                # así jugadores y espectadores no ven la partida congelada.
+                self.terminando = True
+                self.en_segundo_plano(self.terminar_run())
             # Tick de periodo fijo: se descuenta lo que tardó este tick
             siguiente += TICK_S
             await asyncio.sleep(max(0.0, siguiente - time.perf_counter()))
             if time.perf_counter() - siguiente > 1.0:   # muy atrasado: no intentar recuperar
                 siguiente = time.perf_counter()
+        if self.tareas:                          # deja terminar el cierre antes de salir
+            await asyncio.gather(*self.tareas, return_exceptions=True)
 
 
 async def main() -> None:

@@ -29,6 +29,23 @@ locust -f locustfile.py Jugador -u 1000 -r 2 -t 20m --headless --processes -1 --
 
 `--processes` no funciona en Windows: en la nube Locust corre en una VM Linux (como indica el PDF).
 
+**Espectadores con Agones:** encuentran las runs a través de los jugadores *del mismo proceso*.
+Lánzalos en el mismo comando (`Jugador Espectador`, con `--class-picker` o pesos) o pásales
+`ESPECTAR=ws://ip:puerto,...`. Si no tienen runs que mirar, aparece el error `sin_runs`
+(antes la prueba "pasaba" con 0 peticiones).
+
+**Vigila la CPU de la VM de Locust:** si se satura, el RTT y los huecos de los espectadores
+suben por culpa del generador, no del servidor. Compáralo con `torre_tick_lag_seconds` del servidor.
+
+## Códigos de rechazo del servidor
+| Código | Motivo |
+|---|---|
+| 4000 | Partida llena (4 jugadores) |
+| 4001 | La run ya empezó |
+| 4002 | Primer mensaje inválido (se esperaba `{"hola": {...}}`) |
+| 4003 | La run está terminando (Locust espera 3 s antes de reintentar) |
+| 4004 | Ese id ya está en la partida |
+
 ## Variables
 | Variable | Defecto | Qué hace |
 |---|---|---|
@@ -47,7 +64,10 @@ locust -f locustfile.py Jugador -u 1000 -r 2 -t 20m --headless --processes -1 --
 | `RUN run_victoria` / `run_derrota` | Una run terminada; el "tiempo" es la duración del combate |
 | `WS snapshot_espectador` | Hueco entre snapshots (≈100 ms); > 300 ms cuenta como `SnapshotTardio` (el "rebuffering"); los bytes sirven para el egress |
 
+Las runs se cuentan **una vez por run** (la reporta el primer jugador del grupo por id).
+
 ## Resultados medidos
 | Fecha | Prueba | Resultado |
 |---|---|---|
 | 9 nov | Local, 2 jugadores + 2 espectadores, 75 s | Conexión 6–12 ms; RTT mediana 1 ms, p99 11 ms; snapshots de espectador mediana 100 ms, 2 de 1 358 tardíos (~456 ms); 1 run terminada |
+| 9 nov | Igual, tras la auditoría | Conexión 5–10 ms; RTT mediana 1 ms, p99 2 ms; espectadores mediana 100 ms, 2 de 1 462 tardíos (~480 ms) **del lado de Locust**: en el servidor ningún tick empezó > 50 ms tarde (1 543 ticks, retraso medio 8 ms en Windows); 1 run contada una vez |

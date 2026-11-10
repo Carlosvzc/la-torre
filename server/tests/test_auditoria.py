@@ -126,6 +126,104 @@ def test_sin_agones_no_se_manda_latido(monkeypatch):
     assert "/health" not in llamadas
 
 
+# --- Auditoría de Locust (9 nov): el cierre de la run no congela ni confunde ----------
+async def _servidor_con_run_perdida(monkeypatch, espera):
+    """Arranca servidor + bucle, mete a 'ana' y la derrota: la run queda cerrándose."""
+    monkeypatch.setattr(server, "ESPERA_CIERRE_S", espera)
+    srv = server.Servidor(semilla=1)
+    ws_server = await websockets.serve(srv.atender, "127.0.0.1", 0)
+    url = f"ws://127.0.0.1:{ws_server.sockets[0].getsockname()[1]}"
+    bucle = asyncio.create_task(srv.bucle())
+    ana = await websockets.connect(url)
+    await ana.send(json.dumps({"hola": {"id": "ana"}}))
+    await ana.recv()
+    await ana.send(json.dumps({"accion": "listo"}))
+    await asyncio.sleep(0.2)
+    srv.partida.jugadores["ana"].recibir_dano(1e9)
+    await asyncio.sleep(0.2)
+    return srv, ws_server, url, bucle, ana
+
+
+def test_el_cierre_de_la_run_no_congela_los_ticks(monkeypatch):
+    async def caso():
+        srv, ws_server, url, bucle, ana = await _servidor_con_run_perdida(monkeypatch, 2.0)
+        assert srv.terminando
+        n0 = srv.n_tick
+        await asyncio.sleep(1.0)                         # en pleno cierre (dura 2 s)
+        ticks = srv.n_tick - n0
+        bucle.cancel()
+        await ana.close()
+        ws_server.close()
+        return ticks
+    ticks = asyncio.run(caso())
+    assert ticks >= 15, f"solo {ticks} ticks en 1 s de cierre: el cierre congela la partida"
+
+
+def test_entrar_durante_el_cierre_da_4003_con_motivo_claro(monkeypatch):
+    async def caso():
+        srv, ws_server, url, bucle, ana = await _servidor_con_run_perdida(monkeypatch, 2.0)
+        nuevo = await websockets.connect(url)
+        await nuevo.send(json.dumps({"hola": {"id": "beto"}}))
+        with pytest.raises(websockets.ConnectionClosed) as e:
+            await nuevo.recv()
+        bucle.cancel()
+        await ana.close()
+        ws_server.close()
+        return e.value.rcvd
+    cierre = asyncio.run(caso())
+    assert cierre.code == 4003 and "terminando" in cierre.reason
+
+
+def test_en_local_tras_el_cierre_se_puede_entrar_otra_vez(monkeypatch):
+    async def caso():
+        srv, ws_server, url, bucle, ana = await _servidor_con_run_perdida(monkeypatch, 0.2)
+        await asyncio.sleep(0.6)                         # el cierre ya terminó
+        nuevo = await websockets.connect(url)
+        await nuevo.send(json.dumps({"hola": {"id": "beto"}}))
+        bienvenida = json.loads(await nuevo.recv())
+        bucle.cancel()
+        for ws in (ana, nuevo):
+            await ws.close()
+        ws_server.close()
+        return bienvenida, srv.terminando
+    bienvenida, terminando = asyncio.run(caso())
+    assert bienvenida["bienvenida"]["id"] == "beto" and not terminando
+
+
+def test_id_repetido_da_4004():
+    async def caso():
+        srv = server.Servidor(semilla=1)
+        ws_server = await websockets.serve(srv.atender, "127.0.0.1", 0)
+        url = f"ws://127.0.0.1:{ws_server.sockets[0].getsockname()[1]}"
+        uno = await websockets.connect(url)
+        await uno.send(json.dumps({"hola": {"id": "ana"}}))
+        await uno.recv()
+        dos = await websockets.connect(url)
+        await dos.send(json.dumps({"hola": {"id": "ana"}}))
+        with pytest.raises(websockets.ConnectionClosed) as e:
+            await dos.recv()
+        await uno.close()
+        ws_server.close()
+        return e.value.rcvd.code
+    assert asyncio.run(caso()) == 4004
+
+
+def test_las_tareas_en_segundo_plano_quedan_referenciadas():
+    async def caso():
+        srv = server.Servidor(semilla=1)
+        evento = asyncio.Event()
+
+        async def espera():
+            await evento.wait()
+        srv.en_segundo_plano(espera())
+        guardadas = len(srv.tareas)
+        evento.set()
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        return guardadas, len(srv.tareas)
+    assert asyncio.run(caso()) == (1, 0)
+
+
 # --- Hallazgo 5: presentación mal formada → cierre limpio 4002 -----------------------
 @pytest.mark.parametrize("hola", ['{"hola": "texto"}', '{"hola": 5}', '{"otro": 1}', "[]"])
 def test_presentacion_mal_formada_cierra_con_4002(hola):

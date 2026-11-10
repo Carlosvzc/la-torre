@@ -181,3 +181,18 @@ def test_sin_agones_las_llamadas_al_sdk_no_fallan(monkeypatch):
 def test_metricas_con_prefijo_del_juego():
     nombres = {m.name for m in server.JUGADORES.collect()} | {m.name for m in server.TICK.collect()}
     assert "torre_players_connected" in nombres and "torre_tick_seconds" in nombres
+
+
+def test_se_mide_el_retraso_del_tick():
+    def muestras():
+        return next(s.value for m in server.RETRASO.collect() for s in m.samples
+                    if s.name == "torre_tick_lag_seconds_count")
+    antes = muestras()
+
+    async def caso():
+        srv = server.Servidor(semilla=1)
+        tarea = asyncio.create_task(srv.bucle())
+        await asyncio.sleep(0.3)
+        tarea.cancel()
+    asyncio.run(caso())
+    assert muestras() - antes >= 4

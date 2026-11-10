@@ -125,7 +125,10 @@ la-torre/
 - [ ] Tomar **capturas 3.3 (1 y 2)** siguiendo `docs/capturas.md`
 - [x] Locust local: `Jugador` (run completa, RTT) y `Espectador` (huecos y bytes) contra el servidor
 - [x] Corregido: el latido `/health` congelaba los ticks ~2 s cada 2 s (encontrado con Locust; 75 pruebas)
-- [ ] Para 3.4: revisar los errores sueltos al cambiar de run (conexión rechazada y timeout de 5 s)
+- [x] Auditoría de Locust: el cierre de la run congelaba ~3 s la partida (ahora en segundo plano),
+      rechazos con código claro (4003/4004), espectadores ya no fallan en silencio, runs contadas
+      una vez, pongs perdidos; métrica nueva `torre_tick_lag_seconds` (81 pruebas)
+- [ ] Verificar en kind: `/ready` con el sidecar de Agones (hoy se intenta una sola vez al arrancar)
 - [ ] Commit por cada pieza
 
 ### Fase 2 — Práctica 3.1 (11 nov)
