@@ -216,7 +216,10 @@ música ni diseños reconocibles de Nintendo o FromSoftware. Caballero, jefes y 
 - [x] Avisos en el suelo, ondas de impacto, chispas, números de daño, sacudida de cámara, sonido sintetizado
 - [x] HUD: vida/resistencia, barra del jefe con fases, bendiciones, sala de espera, fin de run
 - [x] Modo espectador (cámara orbital) y modo pixelado (`P`)
+- [x] 4 clases (Caballero, Bárbaro, Cazadora, Hechicero): servidor, 21 pruebas, modelos, animaciones,
+      efectos y HUD; balance medido (las 4 ganan 10/10 con el bot)
 - [ ] Probarlo jugando tú (balance, sensación de control) y ajustar
+- [ ] Reentrenar el bot de 3.1 si hace falta: se entrenó con el caballero anterior (100 vida, 15 daño)
 
 ## 5. Decisiones pendientes
 - ¿El profesor acepta espectadores por WebSocket en lugar de HLS?

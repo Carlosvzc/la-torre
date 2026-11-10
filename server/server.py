@@ -235,7 +235,8 @@ class Servidor:
         if p.estado != "abandonada" and p.jugadores:
             await asyncio.to_thread(reportar_resultado, p.resultado())
         log.info("run terminada: %s (%s)", p.estado, p.motivo_fin)
-        await asyncio.sleep(ESPERA_CIERRE_S)     # que todos vean la pantalla final
+        if p.estado != "abandonada":             # nadie mira una run abandonada: no se espera
+            await asyncio.sleep(ESPERA_CIERRE_S)  # que todos vean la pantalla final
 
         if self.con_agones:                      # en Agones: el pod se apaga y se recicla
             self.cerrando = True

@@ -51,6 +51,12 @@
   <h1>LA TORRE · cliente de pruebas</h1>
   <input id="url" value="ws://localhost:7654" size="22" aria-label="Servidor">
   <input id="nombre" placeholder="tu nombre" size="12" aria-label="Nombre">
+  <select id="clase" aria-label="Clase">
+    <option value="caballero">Caballero</option>
+    <option value="barbaro">Bárbaro</option>
+    <option value="cazadora">Cazadora</option>
+    <option value="hechicero">Hechicero</option>
+  </select>
   <select id="rol" aria-label="Rol">
     <option value="jugador">Jugador</option>
     <option value="espectador">Espectador</option>
@@ -90,7 +96,7 @@
     <div class="bloque tenue">
       <h3>Controles</h3>
       <kbd>W A S D</kbd> mover · <kbd>J</kbd> o clic atacar (al jefe)<br>
-      <kbd>Espacio</kbd> esquivar · <kbd>Enter</kbd> listo · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> mejora
+      <kbd>Espacio</kbd> esquivar · <kbd>K</kbd> habilidad · <kbd>Enter</kbd> listo · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> mejora
     </div>
   </aside>
 </main>
@@ -130,7 +136,7 @@ function conectar() {
   try { ws = new WebSocket($("url").value.trim()); }
   catch (e) { ponerEstado("URL inválida"); return; }
   const este = ws;
-  ws.onopen = () => este.send(JSON.stringify({ hola: { id: miId, rol: miRol } }));
+  ws.onopen = () => este.send(JSON.stringify({ hola: { id: miId, rol: miRol, clase: $("clase").value } }));
   ws.onmessage = (m) => {
     const d = JSON.parse(m.data);
     if ("pong" in d) { rtt = performance.now() - d.pong; return; }
@@ -173,6 +179,9 @@ function registrarEvento(e, snap) {
   else if (e.tipo === "impacto") texto = e.dano > 0 ? `${e.ataque} alcanza a ${e.jugador} (−${e.dano})`
                                                      : `${e.jugador} esquiva ${e.ataque}`;
   else if (e.tipo === "fin") { fin = e; texto = `FIN: ${e.resultado} (${e.motivo})`; }
+  else if (e.tipo === "explosion") texto = `bola de fuego de ${e.jugador}: ${e.acierto ? "¡impacto!" : "falló"}`;
+  else if (e.tipo === "nova") texto = `${e.jugador} lanza Nova de escarcha`;
+  else if (e.tipo === "disparo" && e.cargado) texto = `${e.jugador}: disparo perforante ${e.acierto ? "acierta" : "falla"}`;
   if (!texto) return;                                  // los golpes del caballero no se listan (son muchos)
   const li = document.createElement("li");
   li.textContent = `[${snap.t.toFixed(1)} s] ${texto}`;
@@ -270,7 +279,11 @@ addEventListener("keydown", (e) => {
   if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) {
     teclas.add(k); actualizarMovimiento(); e.preventDefault();
   } else if (k === "j" && !e.repeat) atacar();
-  else if ((k === " " || k === "k") && !e.repeat) { esquivar(); e.preventDefault(); }
+  else if (k === " " && !e.repeat) { esquivar(); e.preventDefault(); }
+  else if ((k === "k" || k === "q") && !e.repeat) {
+    const [yo, jefe] = yoYJefe();
+    if (yo) enviar({ accion: "habilidad", dx: jefe.x - yo.x, dy: jefe.y - yo.y });
+  }
   else if (k === "enter") enviar({ accion: "listo" });
   else if (["1", "2", "3"].includes(k)) elegir(Number(k) - 1);
 });
@@ -361,6 +374,11 @@ function cuadro() {
     // se dibuja con un tick de retraso, interpolando entre los dos últimos snapshots
     const alfa = Math.min(1, (performance.now() - tActual) / TICK_MS);
     if (actual.jefe) { dibujarAviso(actual.jefe); dibujarJefe(actual.jefe, previo && previo.jefe, alfa); }
+    for (const p of actual.proyectiles || []) {          // bolas de fuego: marca de destino y bola en vuelo
+      circulo(p.x, p.y, 1.2, "rgba(255,138,42,0.15)", "rgba(255,138,42,0.8)", 2);
+      const q = Math.min(1, 1 - p.en / 0.35);
+      circulo(p.x0 + (p.x - p.x0) * q, p.y0 + (p.y - p.y0) * q, 0.25, "#ffa03a", null);
+    }
     for (const [id, c] of Object.entries(actual.jugadores))
       dibujarCaballero(id, c, previo && previo.jugadores[id], alfa);
   } else {

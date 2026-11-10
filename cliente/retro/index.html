@@ -53,7 +53,7 @@
   #info { position: fixed; right: 18px; top: 16px; text-align: right; color: var(--tenue); font-size: 12px; pointer-events: none; }
   #info .piso { font-family: Cinzel, Georgia, serif; font-size: 16px; color: var(--oro); }
   #ayuda { position: fixed; right: 18px; bottom: 14px; color: #6f675e; font-size: 12px; text-align: right; pointer-events: none; }
-  #eventos { position: fixed; left: 20px; top: 110px; width: 340px; font-size: 13px; pointer-events: none;
+  #eventos { position: fixed; left: 20px; top: 175px; width: 340px; font-size: 13px; pointer-events: none;
              display: flex; flex-direction: column; gap: 2px; }
   #eventos div { color: #c9c0b2; text-shadow: 0 1px 2px #000; animation: desvanecer 6s forwards; }
   @keyframes desvanecer { 0%, 70% { opacity: 1 } 100% { opacity: 0 } }
@@ -78,6 +78,23 @@
   .carta .tecla { color: #6f675e; font-size: 12px; margin-top: 10px; display: block; }
   kbd { background: #1b1720; border: 1px solid #3a3024; border-radius: 3px; padding: 0 5px; font-size: 12px; }
 
+  /* Selección de clase */
+  .clases { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 920px; padding: 0 12px; }
+  .clase { width: 205px; padding: 12px 12px 10px; background: var(--panel); border: 1px solid #3a3024; cursor: pointer;
+           transition: transform .12s, border-color .12s; text-align: left; }
+  .clase:hover { transform: translateY(-3px); border-color: var(--oro-tenue); }
+  .clase.elegida { border-color: var(--oro); box-shadow: 0 0 18px rgba(216,180,106,.25); }
+  .clase b { font-family: Cinzel, Georgia, serif; color: var(--oro); font-size: 17px; display: block; }
+  .clase .estilo { color: #c9c0b2; font-size: 12px; margin: 2px 0 8px; display: block; }
+  .clase small { color: var(--tenue); display: block; font-size: 12px; line-height: 1.45; }
+  .clase small b { display: inline; font: inherit; font-weight: 700; color: var(--oro); }
+  .clase .stats { display: flex; gap: 6px; margin-top: 8px; font-size: 11px; color: #8c8378; }
+  /* Habilidad en el HUD */
+  #habilidad { display: flex; align-items: center; gap: 8px; margin-top: 2px; font-size: 13px; }
+  #habilidad .caja { position: relative; width: 34px; height: 34px; border: 1px solid var(--oro-tenue); background: rgba(0,0,0,.6);
+                     display: flex; align-items: center; justify-content: center; font-family: Cinzel, Georgia, serif; color: var(--oro); overflow: hidden; }
+  #habilidad .recarga { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.7); }
+  #efectos { font-size: 12px; color: #9fd0ff; margin-top: 4px; min-height: 16px; }
   #numeros { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
   .numero { position: absolute; font-family: Cinzel, Georgia, serif; font-weight: 700; font-size: 20px;
             text-shadow: 0 2px 3px #000; transform: translate(-50%, -50%); }
@@ -93,6 +110,7 @@
 <div id="inicio">
   <h1 class="titulo">LA TORRE</h1>
   <p>Cuatro jefes. Una subida. Ninguna segunda oportunidad.</p>
+  <div class="clases" id="clases"></div>
   <div class="formulario">
     <input id="url" value="ws://localhost:7654" size="20" aria-label="Servidor">
     <input id="nombre" placeholder="tu nombre" size="12" maxlength="24" aria-label="Nombre">
@@ -106,6 +124,8 @@
   <div class="titulo" id="miNombre"></div>
   <div class="barra"><div class="eco" id="ecoVida"></div><div id="barraVida" style="background:var(--vida)"></div></div>
   <div class="barra" style="height:8px"><div id="barraStamina" style="background:var(--stamina)"></div></div>
+  <div id="habilidad"><div class="caja">K<div class="recarga" id="recarga"></div></div><span id="nombreHabilidad"></span></div>
+  <div id="efectos"></div>
   <div id="aliados"></div>
 </div>
 <div id="hudJefe" class="oculto">
@@ -115,7 +135,7 @@
 <div id="info" class="oculto"><div class="piso" id="piso"></div><div id="detalle"></div></div>
 <div id="eventos"></div>
 <div id="ayuda" class="oculto">
-  <kbd>W A S D</kbd> mover (fijado al jefe) · <kbd>J</kbd>/clic atacar · <kbd>Espacio</kbd> esquivar<br>
+  <kbd>W A S D</kbd> mover (fijado al jefe) · <kbd>J</kbd>/clic atacar · <kbd>Espacio</kbd> esquivar · <kbd>K</kbd>/<kbd>Q</kbd> habilidad<br>
   <kbd>Enter</kbd> listo · <kbd>1 2 3</kbd> mejora · <kbd>P</kbd> pixelado · <kbd>M</kbd> sonido
 </div>
 <div id="banner"><div class="franja"><div class="grande titulo" id="bannerGrande"></div><div class="chico" id="bannerChico"></div></div></div>
@@ -424,18 +444,24 @@ function actualizarOndas(dt) {
 // =====================================================================================
 //  El caballero (low-poly, generado por código)
 // =====================================================================================
-function crearCaballero(color) {
+function crearCaballero(color, clase = "caballero") {
   // Jerarquía: raiz → giro (cintura, para la voltereta) → cuerpo → piernas (muslo → rodilla)
-  //                                                             → pecho (torso) → cuello, brazos (hombro → codo), capa
+  //                                                             → pecho (torso) → cuello, brazos (hombro → codo → mano), capa
+  // Las 4 clases comparten el esqueleto (y por lo tanto las animaciones base); cambian
+  // la cabeza, el arma, la mano libre, la ropa y las proporciones.
   const raiz = new THREE.Group(), giro = new THREE.Group(), cuerpo = new THREE.Group();
   giro.position.y = 0.6; cuerpo.position.y = -0.6;
   raiz.add(giro); giro.add(cuerpo);
-  const acero = mat(0xaab0b8, { map: texMetal, shininess: 40, specular: 0x555555 });
+  const COLOR_ARMADURA = { caballero: 0xaab0b8, barbaro: 0x7a5236, cazadora: 0x6b5236, hechicero: 0x3d3352 };
+  const acero = mat(COLOR_ARMADURA[clase] || 0xaab0b8, { map: clase === "caballero" ? texMetal : texTela,
+                                                       shininess: clase === "caballero" ? 40 : 8, specular: 0x444444 });
   const tinte = mat(color, { map: texTela });
   const oscuro = mat(0x24202a);
+  const piel = mat(0xc08a6a);
   const hoja = mat(0xd8dde4, { shininess: 90, specular: 0xaaaaaa, emissive: 0x111418 });
-  const capaMat = mat(new THREE.Color(color).multiplyScalar(0.55).getHex(), { map: texTela, side: THREE.DoubleSide });
-  const mats = [acero, tinte, oscuro, hoja, capaMat];
+  const capaMat = mat(new THREE.Color(clase === "barbaro" ? 0x5a3a22 : color).multiplyScalar(clase === "barbaro" ? 1 : 0.55).getHex(),
+                      { map: texTela, side: THREE.DoubleSide });
+  const mats = [acero, tinte, oscuro, hoja, capaMat, piel];
 
   // Piernas con rodilla
   const piernas = [-1, 1].map((s) => {
@@ -453,46 +479,108 @@ function crearCaballero(color) {
   pieza(new THREE.CylinderGeometry(0.31, 0.31, 0.09, 6), oscuro, 0, -0.02, 0, pecho);
   pieza(new THREE.CylinderGeometry(0.25, 0.3, 0.55, 6), acero, 0, 0.26, 0, pecho);
   pieza(new THREE.BoxGeometry(0.34, 0.55, 0.06), tinte, 0, 0.16, 0.27, pecho);
+  if (clase === "barbaro") pecho.scale.set(1.18, 1.05, 1.12);          // más corpulento
+  if (clase === "cazadora") pecho.scale.set(0.9, 1, 0.9);              // más ligera
+  if (clase === "hechicero") {                                         // túnica larga sobre las piernas
+    const tunica = pieza(new THREE.CylinderGeometry(0.3, 0.42, 0.62, 7, 1, true), acero, 0, 0.3, 0, cuerpo);
+    tunica.material = mat(0x3d3352, { map: texTela, side: THREE.DoubleSide }); mats.push(tunica.material);
+  }
   const cuello = new THREE.Group(); cuello.position.y = 0.55; pecho.add(cuello);
-  const cabeza = pieza(new THREE.CylinderGeometry(0.18, 0.21, 0.32, 6), acero, 0, 0.16, 0, cuello);
-  pieza(new THREE.BoxGeometry(0.28, 0.04, 0.06), mat(0x050505), 0, 0.02, 0.18, cabeza);
-  const penacho = pieza(new THREE.ConeGeometry(0.07, 0.4, 4), tinte, 0, 0.3, -0.06, cabeza);
-  penacho.rotation.x = -0.5;
-  for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.2, 0.13, 0.28), acero, s * 0.33, 0.5, 0, pecho);
 
-  // Brazos con codo; la espada va en la mano derecha y el escudo en el antebrazo izquierdo
+  // Cabeza según la clase
+  if (clase === "caballero") {
+    const cabeza = pieza(new THREE.CylinderGeometry(0.18, 0.21, 0.32, 6), acero, 0, 0.16, 0, cuello);
+    pieza(new THREE.BoxGeometry(0.28, 0.04, 0.06), mat(0x050505), 0, 0.02, 0.18, cabeza);
+    const penacho = pieza(new THREE.ConeGeometry(0.07, 0.4, 4), tinte, 0, 0.3, -0.06, cabeza); penacho.rotation.x = -0.5;
+  } else if (clase === "barbaro") {
+    pieza(new THREE.BoxGeometry(0.26, 0.26, 0.26), piel, 0, 0.14, 0, cuello);
+    const casco = pieza(new THREE.CylinderGeometry(0.17, 0.2, 0.14, 6), acero, 0, 0.3, 0, cuello);
+    for (const s of [-1, 1]) {                                          // cuernos
+      const cuerno = pieza(new THREE.ConeGeometry(0.05, 0.3, 4), mat(0xe8dcc0), s * 0.2, 0.1, 0, casco);
+      cuerno.rotation.z = -s * 1.1;
+    }
+    pieza(new THREE.BoxGeometry(0.62, 0.16, 0.36), mat(0x4a3424, { map: texTela }), 0, -0.07, 0, cuello);   // pieles
+  } else if (clase === "cazadora") {
+    pieza(new THREE.BoxGeometry(0.22, 0.24, 0.22), piel, 0, 0.13, 0.01, cuello);
+    const capucha = pieza(new THREE.ConeGeometry(0.24, 0.48, 6), tinte, 0, 0.26, -0.04, cuello);
+    capucha.rotation.x = -0.25;
+  } else {
+    pieza(new THREE.BoxGeometry(0.22, 0.24, 0.22), piel, 0, 0.13, 0.01, cuello);
+    pieza(new THREE.CylinderGeometry(0.34, 0.34, 0.03, 10), tinte, 0, 0.28, 0, cuello);   // ala del sombrero
+    const punta = pieza(new THREE.ConeGeometry(0.19, 0.6, 7), tinte, 0, 0.58, -0.04, cuello);
+    punta.rotation.x = -0.25;
+  }
+  if (clase !== "hechicero") for (const s of [-1, 1]) pieza(new THREE.BoxGeometry(0.2, 0.13, 0.28), acero, s * 0.33, 0.5, 0, pecho);
+
+  // Brazos con codo y mano
   const brazo = (s) => {
     const hombro = new THREE.Group(); hombro.position.set(s * 0.37, 0.45, 0); pecho.add(hombro);
-    pieza(new THREE.BoxGeometry(0.12, 0.23, 0.14), acero, 0, -0.11, 0, hombro);
+    pieza(new THREE.BoxGeometry(0.12, 0.23, 0.14), clase === "barbaro" ? piel : acero, 0, -0.11, 0, hombro);
     const codo = new THREE.Group(); codo.position.y = -0.22; hombro.add(codo);
-    pieza(new THREE.BoxGeometry(0.11, 0.21, 0.13), acero, 0, -0.1, 0, codo);
+    pieza(new THREE.BoxGeometry(0.11, 0.21, 0.13), clase === "barbaro" ? piel : acero, 0, -0.1, 0, codo);
     const mano = new THREE.Group(); mano.position.y = -0.21; codo.add(mano);
     return { hombro, codo, mano };
   };
   const brazoD = brazo(1), brazoI = brazo(-1);
-  const espada = new THREE.Group(); espada.position.set(0, 0, 0.04); espada.rotation.x = Math.PI / 2; brazoD.mano.add(espada);
-  pieza(new THREE.BoxGeometry(0.045, 0.16, 0.045), oscuro, 0, 0, 0, espada);
-  pieza(new THREE.BoxGeometry(0.28, 0.045, 0.07), acero, 0, 0.09, 0, espada);
-  pieza(new THREE.BoxGeometry(0.075, 0.95, 0.02), hoja, 0, 0.58, 0, espada);
-  pieza(new THREE.ConeGeometry(0.038, 0.12, 4), hoja, 0, 1.11, 0, espada);
-  const punta = new THREE.Object3D(); punta.position.y = 1.15; espada.add(punta);      // para la estela
-  const base = new THREE.Object3D(); base.position.y = 0.35; espada.add(base);
-  const escudo = pieza(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 6), tinte, -0.05, -0.08, 0.16, brazoI.codo);
-  escudo.rotation.x = Math.PI / 2;
-  pieza(new THREE.CylinderGeometry(0.33, 0.33, 0.04, 6), acero, 0, -0.02, 0, escudo);
+  const arma = new THREE.Group(); arma.position.set(0, 0, 0.04); arma.rotation.x = Math.PI / 2; brazoD.mano.add(arma);
+  const punta = new THREE.Object3D(), base = new THREE.Object3D();
+  arma.add(punta); arma.add(base);
+  let escudo = null, flechaMano = null, cristal = null;
 
-  // Capa en 3 segmentos encadenados: cada uno sigue al anterior con retraso (movimiento secundario)
+  if (clase === "caballero") {                                        // espada y escudo
+    pieza(new THREE.BoxGeometry(0.045, 0.16, 0.045), oscuro, 0, 0, 0, arma);
+    pieza(new THREE.BoxGeometry(0.28, 0.045, 0.07), acero, 0, 0.09, 0, arma);
+    pieza(new THREE.BoxGeometry(0.075, 0.95, 0.02), hoja, 0, 0.58, 0, arma);
+    pieza(new THREE.ConeGeometry(0.038, 0.12, 4), hoja, 0, 1.11, 0, arma);
+    punta.position.y = 1.15; base.position.y = 0.35;
+    escudo = pieza(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 6), tinte, -0.05, -0.08, 0.16, brazoI.codo);
+    escudo.rotation.x = Math.PI / 2;
+    pieza(new THREE.CylinderGeometry(0.33, 0.33, 0.04, 6), acero, 0, -0.02, 0, escudo);
+  } else if (clase === "barbaro") {                                   // hacha a dos manos
+    pieza(new THREE.CylinderGeometry(0.035, 0.04, 1.25, 6), mat(0x4a3020), 0, 0.45, 0, arma);
+    const filo = pieza(new THREE.BoxGeometry(0.06, 0.42, 0.34), hoja, 0, 0.95, 0.16, arma);
+    filo.rotation.x = 0.15;
+    pieza(new THREE.BoxGeometry(0.07, 0.2, 0.12), acero, 0, 0.95, -0.06, arma);
+    punta.position.set(0, 1.12, 0.3); base.position.set(0, 0.8, 0.3);
+  } else if (clase === "cazadora") {                                  // arco en la izquierda, carcaj a la espalda
+    const arco = new THREE.Group(); arco.position.set(0, -0.02, 0.05); brazoI.mano.add(arco);
+    const madera = mat(0x5a3a1e);
+    const curva = pieza(new THREE.TorusGeometry(0.46, 0.022, 4, 18, Math.PI * 1.15), madera, 0, 0, 0, arco);
+    curva.rotation.set(0, Math.PI / 2, Math.PI / 2 - Math.PI * 0.575);
+    pieza(new THREE.BoxGeometry(0.006, 0.84, 0.006), mat(0xe8e0d0), 0, 0, -0.2, arco);    // cuerda
+    arco.rotation.x = Math.PI / 2;
+    const carcaj = pieza(new THREE.CylinderGeometry(0.07, 0.06, 0.45, 6), mat(0x4a3020), 0.1, 0.28, -0.28, pecho);
+    carcaj.rotation.x = 0.3;
+    for (let k = 0; k < 3; k++) pieza(new THREE.CylinderGeometry(0.008, 0.008, 0.25, 3), mat(0xe8e0d0), (k - 1) * 0.03, 0.3, 0, carcaj);
+    flechaMano = new THREE.Group(); brazoD.mano.add(flechaMano);
+    pieza(new THREE.CylinderGeometry(0.008, 0.008, 0.6, 3), mat(0xd8c8a0), 0, 0, 0.3, flechaMano).rotation.x = Math.PI / 2;
+    pieza(new THREE.ConeGeometry(0.02, 0.06, 4), hoja, 0, 0, 0.62, flechaMano).rotation.x = Math.PI / 2;
+    flechaMano.visible = false;
+    arma.visible = false;
+  } else {                                                            // báculo con cristal
+    pieza(new THREE.CylinderGeometry(0.03, 0.035, 1.6, 6), mat(0x3a2a1a), 0, 0.4, 0, arma);
+    cristal = new THREE.MeshPhongMaterial({ color: 0x8fd0ff, emissive: 0x2a6aff, emissiveIntensity: 0.6, flatShading: true });
+    pieza(new THREE.OctahedronGeometry(0.11, 0), cristal, 0, 1.25, 0, arma);
+    arma.rotation.x = 0.3;                                            // el báculo va casi vertical
+  }
+
+  // Capa en 3 segmentos encadenados (el hechicero no lleva: su túnica ya ondea)
   const capa = [];
   let ancla = new THREE.Group(); ancla.position.set(0, 0.55, -0.27); pecho.add(ancla);
   for (let i = 0; i < 3; i++) {
     const seg = new THREE.Group();
-    if (i > 0) seg.position.y = -0.32;
+    if (i > 0) seg.position.y = clase === "cazadora" ? -0.22 : -0.32;
     ancla.add(seg);
-    pieza(new THREE.PlaneGeometry(0.62 - i * 0.04, 0.33), capaMat, 0, -0.16, 0, seg);
+    if (clase !== "hechicero") pieza(new THREE.PlaneGeometry(0.62 - i * 0.04, clase === "cazadora" ? 0.23 : 0.33), capaMat, 0, -0.16, 0, seg);
     capa.push(seg); ancla = seg;
   }
 
-  // Estela de la espada: una cinta que sigue la hoja durante el tajo
+  // Burbuja del muro de escudo (oculta hasta que se usa)
+  const burbuja = new THREE.Mesh(new THREE.SphereGeometry(0.95, 16, 10),
+    new THREE.MeshBasicMaterial({ color: 0x6fb3ff, transparent: true, opacity: 0.18, depthWrite: false, blending: THREE.AdditiveBlending }));
+  burbuja.position.y = 0.85; burbuja.visible = false; raiz.add(burbuja);
+
+  // Estela del arma (solo los de cuerpo a cuerpo)
   const N = 14;
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(N * 2 * 3), 3));
@@ -505,9 +593,9 @@ function crearCaballero(color) {
   estela.frustumCulled = false;
   raiz.add(estela);
 
-  raiz.add(sombraRedonda(0.5));
-  return { raiz, giro, cuerpo, pecho, cuello, piernas, brazoD, brazoI, capa, punta, base,
-           estela: { malla: estela, puntos: [], N }, mats, tipo: "caballero" };
+  raiz.add(sombraRedonda(clase === "barbaro" ? 0.6 : 0.5));
+  return { raiz, giro, cuerpo, pecho, cuello, piernas, brazoD, brazoI, capa, punta, base, escudo, flechaMano, cristal, burbuja,
+           estela: { malla: estela, puntos: [], N }, mats, clase, tipo: "caballero" };
 }
 
 // =====================================================================================
@@ -620,6 +708,31 @@ function crearJefe(id) {
 //  Estado de red (igual que el cliente 2D) y entidades en la escena
 // =====================================================================================
 let ws = null, miId = null, miRol = "jugador";
+// Clases: el texto de las cartas vive aquí; los números (tiempos, recargas) llegan del servidor
+const CLASES_UI = {
+  caballero: { nombre: "Caballero", estilo: "Equilibrado · cuerpo a cuerpo",
+               texto: "Tajo rápido y armadura completa. <b>K:</b> Muro de escudo (75 % menos daño, 2 s).", stats: "Vida 110 · Daño 17" },
+  barbaro:   { nombre: "Bárbaro", estilo: "Lento y brutal · cuerpo a cuerpo",
+               texto: "Hachazo amplio y devastador; furia con poca vida. <b>K:</b> Grito de guerra (+40 % daño, 6 s).", stats: "Vida 135 · Daño 32" },
+  cazadora:  { nombre: "Cazadora", estilo: "Ágil · a distancia",
+               texto: "Flechas rápidas, +20 % de lejos, voltereta larga. <b>K:</b> Disparo perforante (carga 1 s).", stats: "Vida 80 · Daño 10" },
+  hechicero: { nombre: "Hechicero", estilo: "Magia de zona · a distancia",
+               texto: "La bola de fuego tarda en llegar: anticipa. Esquiva con destello. <b>K:</b> Nova de escarcha (frena al jefe).", stats: "Vida 75 · Daño 24" },
+};
+let claseElegida = "caballero", catalogo = {};
+try { claseElegida = localStorage.getItem("laTorre.clase") || "caballero"; } catch (e) { /* sin almacenamiento */ }
+if (!CLASES_UI[claseElegida]) claseElegida = "caballero";
+function dibujarClases() {
+  $("clases").innerHTML = Object.entries(CLASES_UI).map(([id, c]) =>
+    `<div class="clase${id === claseElegida ? " elegida" : ""}" data-clase="${id}"><b>${c.nombre}</b><span class="estilo">${c.estilo}</span>` +
+    `<small>${c.texto}</small><div class="stats">${c.stats}</div></div>`).join("");
+  for (const el of document.querySelectorAll(".clase")) el.onclick = () => {
+    claseElegida = el.dataset.clase;
+    try { localStorage.setItem("laTorre.clase", claseElegida); } catch (e) { /* sin almacenamiento */ }
+    dibujarClases();
+  };
+}
+dibujarClases();
 let previo = null, actual = null, tActual = 0, rtt = null, fin = null, elegida = false;
 let avisoVisto = null, avisoAnterior = null;
 const caballeros = new Map();            // id → { modelo, estadoPrevio, tEstado, ... }
@@ -641,25 +754,33 @@ function conectar() {
   previo = actual = null; fin = null; elegida = false; avisoVisto = null;
   vaciarBufer();
   limpiarEntidades();
+  $("eventos").innerHTML = "";
   ponerEstado("conectando…");
   try { ws = new WebSocket($("url").value.trim()); } catch (e) { ponerEstado("URL inválida"); return; }
   const este = ws;
-  ws.onopen = () => este.send(JSON.stringify({ hola: { id: miId, rol: miRol } }));
+  ws.onopen = () => este.send(JSON.stringify({ hola: { id: miId, rol: miRol, clase: claseElegida } }));
   ws.onmessage = (m) => {
     const d = JSON.parse(m.data);
     if ("pong" in d) { rtt = performance.now() - d.pong; return; }
-    if (d.bienvenida) { mostrarJuego(); return; }
+    if (d.bienvenida) { catalogo = d.bienvenida.clases || {}; reintentos = 0; mostrarJuego(); return; }
     if ("estado" in d) recibir(d);
   };
   ws.onclose = (e) => {
     if (ws !== este) return;
     ws = null;
+    if (e.code === 4003 && reintentos < 6) {          // la run anterior se está cerrando: reintentar solo
+      reintentos++;
+      ponerEstado("La torre se está preparando…");
+      setTimeout(conectar, 1500);
+      return;
+    }
     if (!fin) {
       ocultarJuego();
       ponerEstado(`Sin conexión (${e.code}${e.reason ? ": " + e.reason : ""})`);
     }
   };
 }
+let reintentos = 0;
 $("botonEntrar").addEventListener("click", conectar);
 $("nombre").addEventListener("keydown", (e) => { if (e.key === "Enter") conectar(); });
 
@@ -712,7 +833,7 @@ function procesarVisual(snap, anterior) {
   const ids = Object.keys(snap.jugadores).sort();
   ids.forEach((id, i) => {
     if (!caballeros.has(id)) {
-      const modelo = crearCaballero(COLORES_JUGADOR[i % COLORES_JUGADOR.length]);
+      const modelo = crearCaballero(COLORES_JUGADOR[i % COLORES_JUGADOR.length], snap.jugadores[id].clase || "caballero");
       escena.add(modelo.raiz);
       const j = snap.jugadores[id];
       caballeros.set(id, { modelo, estado: "libre", tEstado: 0, giro: giroHacia(j.dx, j.dy), fase: 0, flash: 0,
@@ -726,8 +847,12 @@ function procesarVisual(snap, anterior) {
     if (j.estado !== c.estado) {
       if (j.estado === "esquivando") { sonido("esquiva"); particulas.emitir(mundo(j.x, j.y, 0.1), 10, 0x6a6058, 1.2, { gravedad: 2, vida: 0.6 }); }
       if (j.estado === "muerto") sonido("muerte");
+      if (j.estado === "habilidad" && j.clase === "barbaro") { sonido("grito"); sacudida = Math.max(sacudida, 0.12); }
       c.estado = j.estado; c.tEstado = performance.now();
     }
+    const muro = !!(j.efectos && j.efectos.muro);
+    if (muro && !c.muro) sonido("muro");
+    c.muro = muro;
   }
   // El jefe: si cambia de piso, el anterior se desvanece y aparece el nuevo
   if (snap.jefe) {
@@ -765,6 +890,59 @@ function procesarVisual(snap, anterior) {
   if (snap.eventos.some((e) => e.tipo === "fin") && actual) actualizarCapa(actual);
 }
 
+// Flechas: vuelan del arco al jefe (si fallan, pasan de largo)
+const flechas = [];
+const geoFlecha = new THREE.CylinderGeometry(0.015, 0.015, 0.7, 4).rotateX(Math.PI / 2);
+function lanzarFlecha(j, jefe, acierto, cargado) {
+  const desde = mundo(j.x, j.y, 1.2), hacia = mundo(jefe.x, jefe.y, 1.3 * (jefe.radio || 1));
+  if (!acierto) hacia.add(new THREE.Vector3((Math.random() - 0.5) * 4, 0.6, (Math.random() - 0.5) * 4));
+  const malla = new THREE.Mesh(geoFlecha, new THREE.MeshBasicMaterial({ color: cargado ? 0xffe08a : 0xe8dcc0 }));
+  if (cargado) malla.scale.set(2.5, 2.5, 1.4);
+  malla.position.copy(desde); malla.lookAt(hacia);
+  escena.add(malla);
+  flechas.push({ malla, desde, hacia, t: 0, dur: Math.max(0.08, desde.distanceTo(hacia) / 45), cargado, acierto });
+}
+function actualizarFlechas(dt) {
+  for (let k = flechas.length - 1; k >= 0; k--) {
+    const f = flechas[k]; f.t += dt;
+    const q = Math.min(1, f.t / f.dur);
+    f.malla.position.lerpVectors(f.desde, f.hacia, q);
+    if (f.cargado) particulas.emitir(f.malla.position, 2, 0xffd060, 0.4, { gravedad: 0, vida: 0.3 });
+    if (q >= 1) {
+      if (f.acierto) particulas.emitir(f.hacia, f.cargado ? 30 : 8, 0xfff0c0, f.cargado ? 4 : 2, { vida: 0.4 });
+      escena.remove(f.malla); f.malla.material.dispose(); flechas.splice(k, 1);
+    }
+  }
+}
+
+// Bolas de fuego en vuelo (vienen en el snapshot) y la marca de dónde van a estallar
+const bolas = [];
+function dibujarBolas(proyectiles, alfa) {
+  const lista = proyectiles || [];
+  while (bolas.length < lista.length) {
+    const g = new THREE.Group();
+    const esfera = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 1), new THREE.MeshBasicMaterial({ color: 0xffa03a }));
+    const marca = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 32), new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.6, depthWrite: false }));
+    marca.rotation.x = -Math.PI / 2; marca.scale.setScalar(1.2);
+    const luz = new THREE.PointLight(0xff7a2a, 8, 6, 1.6);
+    esfera.add(luz); g.add(esfera); escena.add(g); escena.add(marca);
+    bolas.push({ g, esfera, marca });
+  }
+  bolas.forEach((b, i) => {
+    const p = lista[i];
+    b.g.visible = b.marca.visible = !!p;
+    if (!p) return;
+    const vuelo = 0.35, q = limitar(1 - (p.en - alfa * 0.05) / vuelo, 0, 1);
+    const desde = mundo(p.x0, p.y0, 1.4), hasta = mundo(p.x, p.y, 0.3);
+    b.esfera.position.lerpVectors(desde, hasta, q);
+    b.esfera.position.y += Math.sin(q * Math.PI) * 1.8;               // trayectoria en arco
+    b.esfera.rotation.y += 0.3;
+    b.marca.position.copy(mundo(p.x, p.y, 0.05));
+    b.marca.material.opacity = 0.3 + 0.5 * q;
+    if (Math.random() < 0.8) particulas.emitir(b.esfera.position, 2, 0xff8a2a, 0.6, { gravedad: -1, vida: 0.35 });
+  });
+}
+
 function impactoVisual(aviso) {
   for (const [zx, zy] of aviso.zonas) {
     const p = mundo(zx, zy);
@@ -800,6 +978,27 @@ function evento(e, snap) {
     banner("Enemigo derrotado", "", 2600);
     sonido("victoria");
     if (jefeVista) particulas.emitir(mundo(snap.jefe.x, snap.jefe.y, 1), 120, 0xd8b46a, 5, { radio: 1, vida: 1.6, gravedad: 2 });
+  } else if (e.tipo === "disparo") {
+    const j = snap.jugadores[e.jugador];
+    if (j && snap.jefe) lanzarFlecha(j, snap.jefe, e.acierto, e.cargado);
+    sonido(e.cargado ? "cargado" : "flecha");
+  } else if (e.tipo === "hechizo") {
+    sonido("fuego");
+  } else if (e.tipo === "explosion") {
+    const p = mundo(e.x, e.y);
+    onda(p.x, p.z, 1.6, 0xff7a1a);
+    particulas.emitir(new THREE.Vector3(p.x, 0.3, p.z), 45, 0xff8a2a, 4.5, { radio: 0.8, vida: 0.7 });
+    if (!e.acierto) numero("falló", mundo(e.x, e.y, 1.5), "#9a9187");
+    sonido("explosion");
+  } else if (e.tipo === "nova") {
+    const p = mundo(e.x, e.y);
+    onda(p.x, p.z, e.radio, 0x8fd0ff);
+    particulas.emitir(new THREE.Vector3(p.x, 0.2, p.z), 70, 0xbfe6ff, 5, { radio: 1, vida: 0.8, gravedad: 1 });
+    sacudida = Math.max(sacudida, 0.15);
+    sonido("nova");
+  } else if (e.tipo === "fallo") {
+    const j = snap.jugadores[e.jugador];
+    if (j && e.jugador === miId) numero("fuera de alcance", mundo(j.x, j.y, 2.2), "#9a9187");
   } else if (e.tipo === "entra") texto = `${e.jugador} entra a la torre`;
   else if (e.tipo === "sale") texto = `${e.jugador} abandona la torre`;
   else if (e.tipo === "fin") fin = e;
@@ -853,6 +1052,15 @@ function actualizarHud(s) {
     $("miNombre").textContent = miId;
     ancho("barraVida", yo.vida, yo.vida_max); ancho("ecoVida", yo.vida, yo.vida_max);
     ancho("barraStamina", yo.st, yo.st_max);
+    const datos = catalogo[yo.clase];
+    if (datos) {
+      $("miNombre").textContent = `${miId} · ${datos.nombre}`;
+      $("nombreHabilidad").textContent = yo.recarga > 0 ? `${datos.nombre_habilidad} (${yo.recarga.toFixed(0)} s)` : datos.nombre_habilidad;
+      $("recarga").style.height = `${limitar(100 * (yo.recarga || 0) / datos.recarga_habilidad, 0, 100)}%`;
+    }
+    const ef = yo.efectos || {};
+    $("efectos").textContent = [ef.muro ? `Muro de escudo ${ef.muro.toFixed(1)} s` : "", ef.grito ? `Grito de guerra ${ef.grito.toFixed(0)} s` : "",
+      yo.clase === "barbaro" && yo.vida < yo.vida_max * 0.4 ? "¡Furia!" : ""].filter(Boolean).join(" · ");
     $("barraVida").parentElement.style.width = `${limitar(yo.vida_max / 100, 1, 2) * 100}%`;
   }
   $("aliados").innerHTML = Object.entries(s.jugadores).filter(([id]) => id !== miId).map(([id, j]) =>
@@ -935,6 +1143,11 @@ function atacar() {
   if (!yo || !actual.jefe) return;
   enviar({ accion: "atacar", dx: actual.jefe.x - yo.x, dy: actual.jefe.y - yo.y });
 }
+function usarHabilidad() {
+  const yo = actual && actual.jugadores[miId];
+  if (!yo || !actual.jefe) return;
+  enviar({ accion: "habilidad", dx: actual.jefe.x - yo.x, dy: actual.jefe.y - yo.y });
+}
 function esquivar() {
   const [dx, dy] = direccionDeseada();
   if (Math.abs(dx) + Math.abs(dy) < 1e-6) { const [fx, fy] = haciaElJefe(); enviar({ accion: "esquivar", dx: -fx, dy: -fy }); }
@@ -956,13 +1169,17 @@ addEventListener("keydown", (e) => {
   if (k === "enter" || k === " ") e.preventDefault();
   if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) { teclas.add(k); e.preventDefault(); }
   else if (k === "j" && !e.repeat) atacar();
-  else if ((k === " " || k === "k" || k === "shift") && !e.repeat) esquivar();
+  else if ((k === "k" || k === "q") && !e.repeat) usarHabilidad();
+  else if ((k === " " || k === "shift") && !e.repeat) esquivar();
   else if (k === "enter") enviar({ accion: "listo" });
   else if (["1", "2", "3"].includes(k)) elegir(Number(k) - 1);
 });
 addEventListener("keyup", (e) => teclas.delete(e.key.toLowerCase()));
 addEventListener("blur", () => teclas.clear());
-lienzo.addEventListener("mousedown", (e) => { if (miRol === "jugador" && e.button === 0) atacar(); if (e.button === 2) esquivar(); });
+lienzo.addEventListener("mousedown", (e) => {
+  if (miRol !== "jugador") return;
+  if (e.button === 0) atacar(); else if (e.button === 1) { e.preventDefault(); usarHabilidad(); } else if (e.button === 2) esquivar();
+});
 lienzo.addEventListener("contextmenu", (e) => e.preventDefault());
 
 // =====================================================================================
@@ -1000,6 +1217,14 @@ function sonido(tipo) {
   else if (tipo === "piso") { tono(110, 105, 1.2, "sawtooth", 0.06); tono(165, 160, 1.2, "sine", 0.08); }
   else if (tipo === "victoria") { tono(392, 392, 0.3, "triangle", 0.12); tono(523, 523, 0.3, "triangle", 0.12, 0.15); tono(659, 659, 0.6, "triangle", 0.12, 0.3); }
   else if (tipo === "muerte") tono(260, 55, 1.4, "sawtooth", 0.1);
+  else if (tipo === "flecha") { soplo(0.12, 2600, 0.15, 3); tono(400, 180, 0.08, "triangle", 0.05); }
+  else if (tipo === "cargado") { soplo(0.25, 1800, 0.3, 2); tono(300, 90, 0.25, "sawtooth", 0.08); }
+  else if (tipo === "fuego") { soplo(0.35, 500, 0.2, 0.8); tono(180, 320, 0.3, "sine", 0.06); }
+  else if (tipo === "explosion") { tono(120, 40, 0.5, "sine", 0.35); soplo(0.4, 700, 0.3, 0.6); }
+  else if (tipo === "nova") { tono(900, 1500, 0.4, "triangle", 0.08); soplo(0.6, 3000, 0.15, 1); }
+  else if (tipo === "destello") tono(700, 1400, 0.15, "sine", 0.08);
+  else if (tipo === "grito") { tono(140, 90, 0.7, "sawtooth", 0.15); soplo(0.6, 400, 0.25, 0.7); }
+  else if (tipo === "muro") tono(500, 520, 0.3, "triangle", 0.1);
 }
 
 // =====================================================================================
@@ -1078,26 +1303,71 @@ function animarCaballero(c, ja, jb, alfa, ahora, dt) {
   };
   let kBrazo = [22, 0.75], kCuerpo = [16, 0.75], kAlto = [20, 0.7];
 
-  if (ja.estado === "atacando") {
-    // 0–0.10 anticipación (se agacha y gira) · 0.10–0.27 carga sobre la cabeza ·
-    // 0.27–0.33 tajo con estocada · 0.33–0.45 seguimiento · 0.45–0.55 vuelve a la guardia
-    p.hombroD = claves(t, [[0, -0.5], [0.1, -0.9], [0.27, -3.5], [0.33, -0.7], [0.42, -0.25], [0.55, -0.5]]);
-    p.codoD = claves(t, [[0, -0.6], [0.1, -1.0], [0.27, -1.3], [0.31, -0.1], [0.42, -0.2], [0.55, -0.6]]);
-    p.hombroI = claves(t, [[0, -0.3], [0.27, -0.6], [0.33, 0.25], [0.55, -0.35]]);
-    p.codoI = claves(t, [[0, -0.9], [0.27, -1.2], [0.33, -0.5], [0.55, -0.9]]);
-    p.pechoY = claves(t, [[0, 0], [0.1, -0.25], [0.27, -0.55], [0.33, 0.4], [0.42, 0.45], [0.55, 0]]);
-    p.pechoX = claves(t, [[0, 0.05], [0.1, -0.02], [0.27, -0.15], [0.32, 0.32], [0.42, 0.26], [0.55, 0.06]]);
-    p.alto = claves(t, [[0, 0.6], [0.1, 0.54], [0.27, 0.6], [0.32, 0.5], [0.45, 0.52], [0.55, 0.58]]);
-    p.musloI = claves(t, [[0, -0.15], [0.1, -0.05], [0.27, -0.1], [0.32, -0.7], [0.45, -0.55], [0.55, -0.2]]);
-    p.rodillaI = claves(t, [[0, 0.15], [0.1, 0.35], [0.27, 0.2], [0.32, 0.7], [0.45, 0.6], [0.55, 0.2]]);
-    p.musloD = claves(t, [[0, 0.12], [0.1, 0.2], [0.27, 0.15], [0.32, 0.5], [0.45, 0.45], [0.55, 0.15]]);
-    p.rodillaD = claves(t, [[0, 0.15], [0.1, 0.4], [0.32, 0.25], [0.55, 0.2]]);
+  const datos = catalogo[ja.clase] || { ataque: "tajo", preparacion: 0.3, recuperacion: 0.25 };
+  const destello = ja.clase === "hechicero";
+  if (ja.estado === "atacando" && datos.ataque === "tajo") {
+    // Coreografía del tajo, estirada a los tiempos de la clase (el bárbaro es más lento):
+    // anticipación · carga sobre la cabeza · tajo con estocada · seguimiento · vuelve a la guardia
+    const prep = datos.preparacion, rec = datos.recuperacion;
+    const tt = t < prep ? t * 0.30 / prep : 0.30 + (t - prep) * 0.25 / rec;
+    p.hombroD = claves(tt, [[0, -0.5], [0.1, -0.9], [0.27, -3.5], [0.33, -0.7], [0.42, -0.25], [0.55, -0.5]]);
+    p.codoD = claves(tt, [[0, -0.6], [0.1, -1.0], [0.27, -1.3], [0.31, -0.1], [0.42, -0.2], [0.55, -0.6]]);
+    p.hombroI = claves(tt, [[0, -0.3], [0.27, -0.6], [0.33, 0.25], [0.55, -0.35]]);
+    p.codoI = claves(tt, [[0, -0.9], [0.27, -1.2], [0.33, -0.5], [0.55, -0.9]]);
+    p.pechoY = claves(tt, [[0, 0], [0.1, -0.25], [0.27, -0.55], [0.33, 0.4], [0.42, 0.45], [0.55, 0]]);
+    p.pechoX = claves(tt, [[0, 0.05], [0.1, -0.02], [0.27, -0.15], [0.32, 0.32], [0.42, 0.26], [0.55, 0.06]]);
+    p.alto = claves(tt, [[0, 0.6], [0.1, 0.54], [0.27, 0.6], [0.32, 0.5], [0.45, 0.52], [0.55, 0.58]]);
+    p.musloI = claves(tt, [[0, -0.15], [0.1, -0.05], [0.27, -0.1], [0.32, -0.7], [0.45, -0.55], [0.55, -0.2]]);
+    p.rodillaI = claves(tt, [[0, 0.15], [0.1, 0.35], [0.27, 0.2], [0.32, 0.7], [0.45, 0.6], [0.55, 0.2]]);
+    p.musloD = claves(tt, [[0, 0.12], [0.1, 0.2], [0.27, 0.15], [0.32, 0.5], [0.45, 0.45], [0.55, 0.15]]);
+    p.rodillaD = claves(tt, [[0, 0.15], [0.1, 0.4], [0.32, 0.25], [0.55, 0.2]]);
+    if (ja.clase === "barbaro") {                      // a dos manos: el brazo izquierdo acompaña al hacha
+      p.hombroI = p.hombroD + 0.25; p.codoI = p.codoD; p.pechoY *= 0.6; p.pechoX *= 1.3;
+    }
     kBrazo = [34, 0.72]; kCuerpo = [26, 0.75]; kAlto = [28, 0.75];
-  } else if (ja.estado === "esquivando") {
-    // agacharse · rodar · aterrizar (0.4 s en total, como en el servidor)
-    p.alto = claves(t, [[0, 0.6], [0.05, 0.45], [0.2, 0.35], [0.33, 0.42], [0.4, 0.52]]);
-    p.musloI = p.musloD = claves(t, [[0, -0.1], [0.05, -1.0], [0.3, -1.2], [0.4, -0.4]]);
-    p.rodillaI = p.rodillaD = claves(t, [[0, 0.2], [0.05, 1.3], [0.3, 1.5], [0.4, 0.7]]);
+  } else if (ja.estado === "atacando" && datos.ataque === "flecha") {
+    // Tensar el arco (la cuerda va hacia la cara) y soltar; el disparo cargado tiembla al final
+    const prep = ja.cargado ? 1.0 : datos.preparacion, rec = ja.cargado ? 0.2 : datos.recuperacion;
+    p.hombroI = -1.45; p.codoI = -0.05;                // el brazo del arco apunta al jefe
+    p.hombroD = claves(t, [[0, -0.6], [prep * 0.4, -1.45], [prep, -1.45], [prep + rec * 0.3, -1.15], [prep + rec, -0.6]]);
+    p.codoD = claves(t, [[0, -0.6], [prep * 0.4, -0.5], [prep, -2.1], [prep + 0.04, -0.7], [prep + rec, -0.7]]);
+    if (ja.cargado && t > prep * 0.5 && t < prep) p.codoD += 0.04 * Math.sin(ahora / 22);     // tensión
+    p.pechoY = claves(t, [[0, 0], [prep * 0.5, -0.5], [prep, -0.55], [prep + rec, 0]]);
+    p.cuelloY = mirar * 0.6 + 0.45;                   // la cabeza sigue al jefe aunque el torso gire
+    p.musloI = -0.25; p.musloD = 0.2; p.rodillaI = p.rodillaD = 0.2;
+    kBrazo = [30, 0.75];
+    if (m.flechaMano) m.flechaMano.visible = t < prep;
+  } else if (ja.estado === "atacando" && datos.ataque === "bola") {
+    // Alzar el báculo concentrando el fuego y lanzarlo al frente
+    const prep = datos.preparacion, rec = datos.recuperacion;
+    p.hombroD = claves(t, [[0, -0.5], [prep * 0.7, -2.7], [prep, -1.2], [prep + rec, -0.5]]);
+    p.codoD = claves(t, [[0, -0.6], [prep * 0.7, -0.2], [prep, -0.1], [prep + rec, -0.6]]);
+    p.hombroI = claves(t, [[0, -0.4], [prep * 0.7, -1.6], [prep, -1.0], [prep + rec, -0.4]]);
+    p.codoI = -0.5;
+    p.pechoX = claves(t, [[0, 0.05], [prep * 0.7, -0.15], [prep, 0.25], [prep + rec, 0.05]]);
+    kBrazo = [30, 0.75];
+    if (m.cristal) m.cristal.emissiveIntensity = 0.6 + 3 * limitar(t / prep, 0, 1);
+  } else if (ja.estado === "habilidad" && ja.clase === "barbaro") {
+    // Grito de guerra: brazos arriba, pecho hacia afuera y la cabeza atrás
+    p.hombroD = p.hombroI = claves(t, [[0, -0.5], [0.15, -2.8], [0.6, -2.6]]);
+    p.codoD = p.codoI = -0.35; p.pechoX = -0.3; p.cuelloX = -0.45; p.alto = 0.57;
+    p.musloI = -0.3; p.musloD = 0.3; p.rodillaI = p.rodillaD = 0.35;
+    kBrazo = [24, 0.6];
+  } else if (ja.estado === "habilidad") {
+    // Nova de escarcha: golpe del báculo contra el suelo
+    p.hombroD = claves(t, [[0, -2.6], [0.12, -0.3], [0.45, -0.5]]); p.codoD = -0.2;
+    p.hombroI = claves(t, [[0, -2.2], [0.12, -0.6], [0.45, -0.4]]);
+    p.alto = claves(t, [[0, 0.6], [0.12, 0.42], [0.45, 0.58]]);
+    p.rodillaI = p.rodillaD = claves(t, [[0, 0.1], [0.12, 1.0], [0.45, 0.2]]);
+    p.musloI = p.musloD = claves(t, [[0, 0], [0.12, -0.6], [0.45, -0.1]]);
+    p.pechoX = claves(t, [[0, -0.2], [0.12, 0.45], [0.45, 0.05]]);
+    kBrazo = [40, 0.7]; kAlto = [30, 0.6];
+  } else if (ja.estado === "esquivando" && !destello) {
+    // agacharse · rodar · aterrizar (lo que dure la esquiva de la clase)
+    const dur = (catalogo[ja.clase] && catalogo[ja.clase].duracion_esquiva) || 0.4, u = t * 0.4 / dur;
+    p.alto = claves(u, [[0, 0.6], [0.05, 0.45], [0.2, 0.35], [0.33, 0.42], [0.4, 0.52]]);
+    p.musloI = p.musloD = claves(u, [[0, -0.1], [0.05, -1.0], [0.3, -1.2], [0.4, -0.4]]);
+    p.rodillaI = p.rodillaD = claves(u, [[0, 0.2], [0.05, 1.3], [0.3, 1.5], [0.4, 0.7]]);
     p.hombroD = p.hombroI = -1.0; p.codoD = p.codoI = -1.6; p.pechoX = 0.45; p.pechoY = 0;
     kAlto = [30, 0.75]; kCuerpo = [26, 0.8];
   } else if (ja.estado === "muerto") {
@@ -1110,13 +1380,33 @@ function animarCaballero(c, ja, jb, alfa, ahora, dt) {
     p.codoD = p.codoI = -0.2; p.cuelloX = claves(t, [[0, 0], [0.9, 0.4]]); p.pechoX = claves(t, [[0, 0.1], [0.3, 0.35], [0.9, 0]]);
     kCuerpo = [12, 0.55];
   }
+  // Muro de escudo activo: escudo en alto y burbuja azul
+  const efectos = ja.efectos || {};
+  if (efectos.muro && ja.estado !== "atacando") { p.hombroI = -1.35; p.codoI = -1.3; p.pechoX -= 0.05; }
+  m.burbuja.visible = !!efectos.muro;
+  if (efectos.muro) { m.burbuja.material.opacity = 0.14 + 0.06 * Math.sin(s * 8); m.burbuja.rotation.y += dt; }
+  if (efectos.grito && Math.random() < 0.5) {         // aura de furia del grito de guerra
+    particulas.emitir(mundo(x, y, 0.3 + Math.random()), 1, 0xff3a1a, 0.5, { radio: 0.5, gravedad: -1.2, vida: 0.7 });
+  }
+  if (m.flechaMano && ja.estado !== "atacando") m.flechaMano.visible = false;
+  if (m.cristal && ja.estado !== "atacando") m.cristal.emissiveIntensity = amortiguar(m.cristal.emissiveIntensity, 0.6 + 0.2 * Math.sin(s * 3), 6, dt);
+
   // Golpe recibido: tambaleo (los resortes poco amortiguados lo hacen rebotar)
   p.pechoX -= 0.55 * g; p.cuelloX -= 0.5 * g; p.hombroD += 0.5 * g; p.hombroI += 0.5 * g;
   p.alto -= 0.08 * g; p.rodillaI += 0.4 * g; p.rodillaD += 0.4 * g;
 
   // ---- Aplicar con resortes ------------------------------------------------------------
-  if (ja.estado === "esquivando") {                     // la vuelta es exacta (dura lo que dice el servidor)
-    m.giro.rotation.x = claves(t, [[0, 0], [0.05, 0.25], [0.33, Math.PI * 2 - 0.15], [0.4, Math.PI * 2]]);
+  if (ja.estado === "esquivando" && destello) {          // destello: desaparece y reaparece más allá
+    const q = limitar(t / 0.25, 0, 1);
+    m.raiz.scale.setScalar(0.25 + 0.75 * salida(q));
+    if (c.estAnimPrevio !== "esquivando") {
+      particulas.emitir(mundo(c.xPrevio ?? x, c.yPrevio ?? y, 0.9), 30, 0xa66bff, 2.2, { radio: 0.4, gravedad: 0, vida: 0.5 });
+      particulas.emitir(mundo(x, y, 0.9), 30, 0x8fd0ff, 2.2, { radio: 0.4, gravedad: 0, vida: 0.5 });
+      sonido("destello");
+    }
+  } else if (ja.estado === "esquivando") {               // la vuelta dura lo que dice el servidor para la clase
+    const dur = (catalogo[ja.clase] && catalogo[ja.clase].duracion_esquiva) || 0.4, u = t * 0.4 / dur;
+    m.giro.rotation.x = claves(u, [[0, 0], [0.05, 0.25], [0.33, Math.PI * 2 - 0.15], [0.4, Math.PI * 2]]);
     r.giroX = { x: m.giro.rotation.x, v: 0 };
   } else {
     if (r.giroX && r.giroX.x > Math.PI) r.giroX.x -= Math.PI * 2;      // termina la vuelta sin desandarla
@@ -1146,7 +1436,10 @@ function animarCaballero(c, ja, jb, alfa, ahora, dt) {
   m.capa[0].rotation.x = c0; m.capa[1].rotation.x = c1; m.capa[2].rotation.x = c2;
   m.capa[0].rotation.z = resorte(r, "capaZ", limitar(-velGiro * 0.06, -0.5, 0.5), dt, 6, 0.5);
 
-  actualizarEstela(m, ja.estado === "atacando" && t > 0.2 && t < 0.42);
+  if (!(ja.estado === "esquivando" && destello)) m.raiz.scale.setScalar(1);
+  c.estAnimPrevio = ja.estado; c.xPrevio = x; c.yPrevio = y;
+  const prepA = datos.preparacion || 0.3;
+  actualizarEstela(m, ja.estado === "atacando" && datos.ataque === "tajo" && t > prepA * 0.66 && t < prepA + (datos.recuperacion || 0.25) * 0.5);
   c.flash = Math.max(0, c.flash - dt * 5);              // destello rojo al recibir daño
   for (const mt of m.mats) mt.emissive.setRGB(c.flash * 0.7, 0, 0);
 }
@@ -1250,10 +1543,12 @@ function animarJefe(jv, ja, jb, alfa, aviso, ahora, dt) {
     else m.capa.rotation.z += dt * 0.3;
   }
   jv.flash = Math.max(0, jv.flash - dt * 8);
+  const frio = ja.lento > 0 ? 1 : 0;
   for (const mt of m.mats) {
     if (jv.flash > 0) mt.emissive.setRGB(jv.flash * 0.8, jv.flash * 0.8, jv.flash * 0.75);
-    else mt.emissive.setRGB(0.35 * rojo, 0.05 * rojo, 0);
+    else mt.emissive.setRGB(0.35 * rojo, 0.05 * rojo + 0.12 * frio, 0.32 * frio);    // azulado si está frenado
   }
+  if (frio && Math.random() < 0.4) particulas.emitir(mundo(x, y, 0.5 + Math.random() * 2 * radio), 1, 0xbfe6ff, 0.6, { radio: radio, gravedad: 0.5, vida: 0.8 });
   for (const o of m.ojos) { if (!o.userData.base) o.userData.base = o.color.clone(); o.color.copy(o.userData.base).multiplyScalar(brilloOjos); }
 }
 
@@ -1297,6 +1592,7 @@ function dibujarAvisos(ahora, a) {
 
 // Cámara: detrás del caballero mirando al jefe; los espectadores giran alrededor de la arena
 const objetivoCamara = new THREE.Vector3(), miradaCamara = new THREE.Vector3(0, 1, 0);
+let fovObjetivo = 55;
 function actualizarCamara(dt, ahora) {
   const yo = actual && caballeros.get(miId), jefe = jefeVista && actual && actual.jefe;
   let destino, mirar;
@@ -1309,20 +1605,27 @@ function actualizarCamara(dt, ahora) {
     // La cámara no sale de la arena (afuera hay muros y columnas que la taparían):
     // si no cabe detrás del caballero, se acerca y sube para seguir viendo la escena.
     const LIMITE = 9.6;
-    let distancia = 5.2;
+    // A distancia (cazadora, hechicero) la cámara se aleja y sube para que entren los dos en cuadro
+    const separacion = pk.distanceTo(pj), lejos = Math.max(0, separacion - 3.5);
+    let distancia = 5.2 + lejos * 0.45;
     for (const [p, d] of [[pk.x, atras.x], [pk.z, atras.z]]) {
       if (d > 1e-6) distancia = Math.min(distancia, (LIMITE - p) / d);
       if (d < -1e-6) distancia = Math.min(distancia, (-LIMITE - p) / d);
     }
     distancia = Math.max(1.2, distancia);
-    destino = pk.clone().addScaledVector(atras, distancia).add(new THREE.Vector3(0, 3.1 + (5.2 - distancia) * 0.9, 0));
-    mirar = pk.clone().lerp(pj, 0.35).add(new THREE.Vector3(0, 1.1, 0));
+    const ideal = 5.2 + lejos * 0.45;
+    // si no cabe detrás (pegado al muro) sube un poco, pero sin llegar a una vista cenital
+    destino = pk.clone().addScaledVector(atras, distancia).add(new THREE.Vector3(0, 3.1 + lejos * 0.25 + Math.min(1.6, (ideal - distancia) * 0.6), 0));
+    fovObjetivo = 55 + Math.min(14, lejos * 2.5);      // a distancia se abre el campo de visión
+    mirar = pk.clone().lerp(pj, 0.35 + Math.min(0.15, lejos * 0.03)).add(new THREE.Vector3(0, 1.1, 0));
   } else {                                     // pantalla de inicio y espectadores
     const a = ahora / 9000;
     destino = new THREE.Vector3(Math.sin(a) * 15, 8.5, Math.cos(a) * 15);
     mirar = new THREE.Vector3(0, 0.8, 0);
   }
   const k = 1 - Math.exp(-dt * 5);
+  if (!(miRol === "jugador" && yo)) fovObjetivo = 55;
+  if (Math.abs(camara.fov - fovObjetivo) > 0.05) { camara.fov = lerp(camara.fov, fovObjetivo, 1 - Math.exp(-dt * 3)); camara.updateProjectionMatrix(); }
   camara.position.lerp(destino, k);
   miradaCamara.lerp(mirar, k);
   sacudida = Math.max(0, sacudida - dt * 1.6);
@@ -1366,6 +1669,7 @@ function actualizarCuadro(ahora) {
       }
       animarJefe(jefeVista, sa.jefe, mismoJefe ? sb.jefe : sa.jefe, alfa, avisoDibujado, ahora, dt);
     }
+    dibujarBolas(sa.proyectiles, alfa);
     if (bufer.length > 3 && bufer[1].t < hora - 1000) bufer.splice(0, 1);       // limpia lo viejo
   }
   animarMuertes(dt);
@@ -1380,6 +1684,7 @@ function actualizarCuadro(ahora) {
     particulas.emitir(new THREE.Vector3((Math.random() - 0.5) * 22, 0.2, (Math.random() - 0.5) * 22), 1, 0x6a5a50, 0.4, { gravedad: -0.15, vida: 4, subir: 0.5 });
   }
   particulas.actualizar(dt);
+  actualizarFlechas(dt);
   actualizarOndas(dt);
   actualizarCamara(dt, ahora);
   actualizarNumeros(dt);

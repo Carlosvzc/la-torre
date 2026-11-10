@@ -27,7 +27,8 @@ Cooperativo: varias pestañas o PCs en la misma red (cambia `localhost` por la I
 |---|---|
 | `W A S D` | Mover **relativo al jefe** (W acerca, S aleja, A/D lo rodean) |
 | `J` o clic izquierdo | Atacar (el golpe apunta al jefe) |
-| `Espacio`, `K`, `Shift` o clic derecho | Esquivar (sin dirección: hacia atrás) |
+| `Espacio`, `Shift` o clic derecho | Esquivar (sin dirección: hacia atrás; el Hechicero hace un destello) |
+| `K`, `Q` o clic central | Habilidad de la clase |
 | `Enter` | Listo |
 | `1 2 3` o clic en la carta | Elegir bendición (mejora) |
 | `P` | Modo pixelado (render a baja resolución) |

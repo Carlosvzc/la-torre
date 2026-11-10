@@ -7,7 +7,17 @@ flota de **Agones** sobre Kubernetes. Es el proyecto de la Unidad 3 de Cómputo 
 El plan completo y el avance están en [PLAN.md](PLAN.md).
 
 ## Cómo jugar (reglas)
-- Vida, resistencia (stamina), ataque y esquiva con invulnerabilidad breve.
+- Vida, resistencia (stamina), ataque, esquiva con invulnerabilidad breve y una habilidad por clase.
+- **4 clases** con estilos distintos (el servidor decide todo; el cliente solo elige):
+
+| Clase | Ataque | Esquiva | Habilidad (`K`) | Pasiva |
+|---|---|---|---|---|
+| Caballero | Tajo rápido | Voltereta | Muro de escudo: 75 % menos daño, 2 s | Armadura 10 % |
+| Bárbaro | Hachazo lento y amplio (32) | Voltereta corta | Grito de guerra: +40 % daño y doble resistencia, 6 s | Piel curtida 15 %; furia +50 % con poca vida |
+| Cazadora | Flecha a 10 de alcance | Voltereta larga | Disparo perforante: carga 1 s, 40 de daño | +20 % de daño de lejos |
+| Hechicero | Bola de fuego en zona (tarda 0.35 s: si el jefe se mueve, falla) | Destello (teletransporte) | Nova de escarcha: daño en área y frena al jefe 4 s | — |
+
+  Balance medido con el bot (10 semillas, reflejos perfectos): las 4 clases ganan 10/10; runs de 3.3 a 5.7 min.
 - 4 jefes por run; al vencer a cada uno, el servidor ofrece 3 mejoras al azar.
 - Solo o cooperativo de 2 a 4 jugadores. La run termina en victoria (4 jefes) o derrota (todos caídos).
 
