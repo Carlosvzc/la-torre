@@ -27,7 +27,7 @@ PyTorch 2.15.0 (CPU). **GPU:** Google Colab con NVIDIA T4 (pendiente de correr, 
 | Configuración | Dispositivo | Pasos | Tiempo | Pasos/s |
 |---|---|---|---|---|
 | PDF (1 entorno) | CPU local (Ryzen 5 7533HS) | 100 000 | **158.8 s** | 630 |
-| 8 entornos | CPU local | 1 000 000 | _(en curso)_ | |
+| 8 entornos | CPU local | 1 000 000 | **928.6 s** (15.5 min) | 1 077 |
 | PDF (1 entorno) | CPU de Colab | 100 000 | _pendiente (notebook)_ | |
 | PDF (1 entorno) | GPU T4 de Colab | 100 000 | _pendiente (notebook)_ | |
 
@@ -35,15 +35,26 @@ PyTorch 2.15.0 (CPU). **GPU:** Google Colab con NVIDIA T4 (pendiente de correr, 
 | Jugador | Victorias | Vida media que le queda al jefe |
 |---|---|---|
 | Azar | 0/50 (0 %) | 72.9 % |
-| **Bot PPO, 100 000 pasos** | **10/50 (20 %)** | 17.0 % |
-| Bot de reglas, habilidad 0.85 | 46/50 (92 %) | 1.4 % |
-| Bot de reglas, habilidad 1.0 | 50/50 (100 %) | 0 % |
+| Bot PPO, 100 000 pasos (1 entorno) | 10/50 (20 %) | 17.0 % |
+| **Bot PPO, 1 000 000 pasos (8 entornos)** | **50/50 (100 %)**, en **30.9 s** de media | 0 % |
+| Bot de reglas, habilidad 0.85 | 46/50 (92 %), en 42.6 s | 1.4 % |
+| Bot de reglas, habilidad 1.0 | 50/50 (100 %), en 53.4 s | 0 % |
+
+Con 10 veces más experiencia el bot pasa de 20 % a 100 % de victorias y gana **42 % más rápido**
+que el bot de reglas con reflejos perfectos: aprendió a castigar al jefe en sus ventanas de
+recuperación en lugar de esperar con prudencia. 8 entornos en paralelo subieron el rendimiento
+de 630 a 1 077 pasos/s en la misma CPU. Es la lección del PDF: entrenar es caro y ocasional
+(15.5 min de CPU una vez), inferir es barato y continuo.
 
 ### 3. Latencia de inferencia y capacidad (CPU local, 1 hilo, 10 000 decisiones)
 | Forma de servir el modelo | Latencia media | Decisiones/s por núcleo | vCPU para 2 000 bots a 10 Hz | Con 30 % de margen |
 |---|---|---|---|---|
 | PyTorch (SB3 `predict`) | 0.4291 ms | 2 330 | 8.58 | 11.16, es decir **12 vCPU** |
 | **Red exportada a numpy** | **0.0155 ms** | **64 623** | 0.31 | 0.41, es decir **1 vCPU** |
+
+Modelo de 100 000 pasos. El de 1 000 000 pasos tiene la misma red y midió prácticamente lo mismo:
+0.4408 ms con PyTorch (12 vCPU) y 0.0157 ms con numpy (1 vCPU), con 1 000 de 1 000 decisiones iguales.
+La calidad del bot no cambia el costo de inferencia: depende del tamaño de la red, no del entrenamiento.
 
 Cálculo (fórmula del PDF): decisiones/s = 2 000 bots × 10 Hz = **20 000**;
 vCPU = 20 000 ÷ decisiones/s por núcleo × 1.3.

@@ -1,0 +1,52 @@
+{
+  "modelo": "bot_cpu_1m_8env",
+  "bot_entrenado": {
+    "victorias": 50,
+    "episodios": 50,
+    "tasa": 1.0,
+    "tiempo_medio_victoria_s": 30.9,
+    "vida_jefe_restante_media": 0.0
+  },
+  "azar": {
+    "victorias": 0,
+    "episodios": 50,
+    "tasa": 0.0,
+    "tiempo_medio_victoria_s": null,
+    "vida_jefe_restante_media": 0.724
+  },
+  "reglas_habilidad_1.0": {
+    "victorias": 50,
+    "episodios": 50,
+    "tasa": 1.0,
+    "tiempo_medio_victoria_s": 53.4,
+    "vida_jefe_restante_media": 0.0
+  },
+  "reglas_habilidad_0.85": {
+    "victorias": 46,
+    "episodios": 50,
+    "tasa": 0.92,
+    "tiempo_medio_victoria_s": 42.6,
+    "vida_jefe_restante_media": 0.014
+  },
+  "inferencia": {
+    "cpu": "1 hilo",
+    "bots": 2000,
+    "hz": 10,
+    "decisiones_s_requeridas": 20000,
+    "pytorch_sb3": {
+      "latencia_ms": 0.4408,
+      "decisiones_s_por_nucleo": 2268,
+      "vcpu_sin_margen": 8.82,
+      "vcpu_con_margen_30": 11.47,
+      "vcpu_redondeadas": 12
+    },
+    "numpy_exportado": {
+      "latencia_ms": 0.0157,
+      "decisiones_s_por_nucleo": 63595,
+      "vcpu_sin_margen": 0.31,
+      "vcpu_con_margen_30": 0.41,
+      "vcpu_redondeadas": 1
+    },
+    "numpy_coincide_con_sb3": "1000/1000"
+  }
+}
