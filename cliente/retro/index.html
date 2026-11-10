@@ -618,7 +618,7 @@ function crearJefe(id) {
   const raiz = new THREE.Group(), giro = new THREE.Group(); raiz.add(giro);
   const arma = new THREE.Group();          // la pieza que se alza al preparar un ataque
   const ojos = [], mats = [], piernas = [];
-  let cabeza = null, capa = null, cuadrupedo = false;
+  let cabeza = null, capa = null, cuadrupedo = false, orbe = null;
   const m = (color, extra) => { const x = mat(color, extra); mats.push(x); return x; };
   const brillo = (color) => { const x = new THREE.MeshBasicMaterial({ color }); ojos.push(x); return x; };
   // pierna articulada en la cadera: la caja cuelga del pivote para poder caminar
@@ -658,8 +658,8 @@ function crearJefe(id) {
     arma.position.set(0.5, 1.6, 0.1);
     pieza(new THREE.ConeGeometry(0.12, 0.6, 5), ceniza, 0, -0.25, 0, arma);
     pieza(new THREE.CylinderGeometry(0.03, 0.03, 2.3, 5), oscuro, 0, 0.0, 0.15, arma);
-    pieza(new THREE.IcosahedronGeometry(0.17, 0), brillo(0xff8a2a), 0, 1.15, 0.15, arma);
-    const luz = new THREE.PointLight(0xff7a2a, 6, 7, 1.6); luz.position.set(0, 1.15, 0.15); arma.add(luz);
+    // el orbe ilumina con la luz fija "luzJefe" (crear luces aquí obligaría a recompilar shaders)
+    orbe = pieza(new THREE.IcosahedronGeometry(0.17, 0), brillo(0xff8a2a), 0, 1.15, 0.15, arma);
     reposo = 0; alzado = -1.4; golpe = 0.5;
   } else if (id === "sabueso") {                   // Sabueso Abismal: bestia de cuatro patas
     cuadrupedo = true;
@@ -714,7 +714,7 @@ function crearJefe(id) {
   giro.add(arma);
   raiz.add(sombraRedonda(1));
   arma.rotation.x = reposo;
-  return { raiz, giro, arma, ojos, mats, piernas, cabeza, capa, cuadrupedo, reposo, alzado, golpe, tipo: id };
+  return { raiz, giro, arma, ojos, mats, piernas, cabeza, capa, cuadrupedo, orbe, reposo, alzado, golpe, tipo: id };
 }
 
 // =====================================================================================
@@ -954,6 +954,12 @@ function actualizarFlechas(dt) {
 
 // Bolas de fuego en vuelo (vienen en el snapshot) y la marca de dónde van a estallar
 const bolas = [];
+// Luces FIJAS para efectos: siempre están en la escena y solo se encienden o apagan.
+// Si se crearan y quitaran, Three.js recompilaría los shaders y el juego daría un tirón
+// (medido: 359 ms y de 10 a 19 programas al aparecer las bolas de fuego).
+const lucesBola = [0, 1, 2].map(() => { const l = new THREE.PointLight(0xff7a2a, 0, 6, 1.6); escena.add(l); return l; });
+const luzJefe = new THREE.PointLight(0xff7a2a, 0, 7, 1.6);
+escena.add(luzJefe);
 function dibujarBolas(proyectiles, alfa) {
   const lista = proyectiles || [];
   while (bolas.length < lista.length) {
@@ -961,8 +967,7 @@ function dibujarBolas(proyectiles, alfa) {
     const esfera = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 1), new THREE.MeshBasicMaterial({ color: 0xffa03a }));
     const marca = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 32), new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: 0.6, depthWrite: false }));
     marca.rotation.x = -Math.PI / 2; marca.scale.setScalar(1.2);
-    const luz = new THREE.PointLight(0xff7a2a, 8, 6, 1.6);
-    esfera.add(luz); g.add(esfera); escena.add(g); escena.add(marca);
+    g.add(esfera); escena.add(g); escena.add(marca);
     bolas.push({ g, esfera, marca });
   }
   bolas.forEach((b, i) => {
@@ -974,6 +979,7 @@ function dibujarBolas(proyectiles, alfa) {
     b.esfera.position.lerpVectors(desde, hasta, q);
     b.esfera.position.y += Math.sin(q * Math.PI) * 1.8;               // trayectoria en arco
     b.esfera.rotation.y += 0.3;
+    if (lucesBola[i]) { lucesBola[i].position.copy(b.esfera.position); lucesBola[i].intensity = 8; }
     b.marca.position.copy(mundo(p.x, p.y, 0.05));
     b.marca.material.opacity = 0.3 + 0.5 * q;
     if (Math.random() < 0.8) particulas.emitir(b.esfera.position, 2, 0xff8a2a, 0.6, { gravedad: -1, vida: 0.35 });
@@ -1599,6 +1605,10 @@ function animarJefe(jv, ja, jb, alfa, aviso, ahora, dt) {
   }
   if (frio && Math.random() < 0.4) particulas.emitir(mundo(x, y, 0.5 + Math.random() * 2 * radio), 1, 0xbfe6ff, 0.6, { radio: radio, gravedad: 0.5, vida: 0.8 });
   for (const o of m.ojos) { if (!o.userData.base) o.userData.base = o.color.clone(); o.color.copy(o.userData.base).multiplyScalar(brilloOjos); }
+  if (m.orbe) {                                     // la luz fija sigue al orbe del báculo de la Bruja
+    m.orbe.getWorldPosition(luzJefe.position);
+    luzJefe.intensity = 6 * brilloOjos * (ja.estado === "muerto" ? 0 : 1);
+  }
 }
 
 function animarMuertes(dt) {
@@ -1692,6 +1702,8 @@ function actualizarCuadro(ahora) {
   const dt = Math.min(0.05, (ahora - ultimo) / 1000); ultimo = ahora;
   actualizarMovimiento(ahora);
   let avisoDibujado = null;
+  luzJefe.intensity = 0;                              // las luces fijas se encienden solo si hacen falta
+  for (const l of lucesBola) l.intensity = 0;
   if (bufer.length) {
     const hora = ahora - retrasoMs();                 // se dibuja un poco en el pasado
     // 1. Los snapshots que ya "llegaron" a la pantalla disparan sus eventos, en orden

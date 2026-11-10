@@ -115,6 +115,30 @@ def test_con_bots_se_puede_conquistar_la_torre():
     assert p.estado == "victoria", p.motivo_fin
 
 
+@pytest.mark.parametrize("nombre", ["Alba (IA)", "Ébano (IA)", "pepe (ia)", "x (IA) "])
+def test_un_humano_no_puede_usar_nombres_de_bot(nombre):
+    p = Partida(semilla=1)
+    assert not p.agregar_jugador(nombre, "cazadora", "bots")
+    assert not p.jugadores and not p.bots
+
+
+def test_auditoria_un_bot_ya_no_reemplaza_al_humano():
+    p = Partida(semilla=1)
+    assert p.agregar_jugador("Alba", "cazadora", "bots")       # parecido, pero no reservado
+    assert len(p.jugadores) == 3 and "Alba" not in p.bots
+    assert p.jugadores["Alba"].clase == "cazadora"
+
+
+def test_protocolo_rechaza_nombre_de_bot():
+    async def caso():
+        srv = server.Servidor(semilla=1)
+        async with websockets.serve(srv.atender, "127.0.0.1", 0) as w:
+            url = f"ws://127.0.0.1:{w.sockets[0].getsockname()[1]}"
+            _, rechazo = await _entrar(url, "Alba (IA)", "bots")
+            return rechazo
+    assert asyncio.run(caso())["cerrado"] == 4004
+
+
 def test_modo_de_sala_invalido():
     assert Partida(semilla=1).puede_entrar("batalla") == "modo de sala desconocido"
 

@@ -29,7 +29,7 @@ import websockets
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
 from juego.combate import CLASES
-from juego.partida import MAX_JUGADORES, Partida
+from juego.partida import MAX_JUGADORES, Partida, nombre_reservado
 
 # Catálogo que se manda en la bienvenida: el cliente anima con los tiempos del servidor
 CATALOGO_CLASES = {k: c.publico() for k, c in CLASES.items()}
@@ -156,6 +156,9 @@ class Servidor:
             return
         if jugador_id in self.partida.jugadores:
             await ws.close(code=4004, reason="ese id ya está en la partida")
+            return
+        if nombre_reservado(jugador_id):
+            await ws.close(code=4004, reason="los nombres que terminan en (IA) son de los bots")
             return
         if not isinstance(clase, str) or clase not in CLASES:
             await ws.close(code=4005, reason="clase desconocida")

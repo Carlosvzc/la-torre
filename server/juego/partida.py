@@ -25,6 +25,12 @@ SALAS = ("solo", "bots", "grupo")
 NOMBRES_BOTS = ("Alba (IA)", "Ébano (IA)")
 HABILIDAD_BOTS = 0.9          # buenos, pero fallan a veces (como un compañero humano)
 TICKS_DECISION_BOTS = 2       # deciden 10 veces por segundo
+
+
+def nombre_reservado(jugador_id: str) -> bool:
+    """Los nombres que terminan en "(IA)" son de los bots: un humano no puede usarlos
+    (si no, un bot podría reemplazarlo o confundirse con él)."""
+    return jugador_id in NOMBRES_BOTS or jugador_id.rstrip().upper().endswith("(IA)")
 ESPERA_MEJORA = 20.0          # tiempo para elegir mejora; luego se elige la primera
 DURACION_MAXIMA = 15 * 60.0   # una run no puede ocupar un servidor para siempre
 VIDA_AL_REVIVIR = 0.3         # en cooperativo, los caídos vuelven al vencer al jefe
@@ -85,7 +91,8 @@ class Partida:
         El primer jugador decide el modo: en solitario la run empieza ya y nadie más entra;
         en grupo se espera a que todos digan "listo" (hasta 3 jugadores).
         """
-        if jugador_id in self.jugadores or clase not in CLASES or self.puede_entrar(sala):
+        if (jugador_id in self.jugadores or nombre_reservado(jugador_id)
+                or clase not in CLASES or self.puede_entrar(sala)):
             return False
         primero = not self.jugadores
         if primero:
