@@ -5,7 +5,7 @@ __pycache__/
 .venv/
 venv/
 
-# Credenciales: NUNCA subirlas (práctica 3.2 y 3.4)
+# Credenciales: NUNCA subirlas (prÃ¡ctica 3.2 y 3.4)
 key.json
 *.pem
 *.key
@@ -32,5 +32,5 @@ ia/*.zip
 Thumbs.db
 desktop.ini
 
-# Resultados de pruebas locales de Locust (los de la nube s� se guardan)
+# Resultados de pruebas locales de Locust (los de la nube se guardan)
 loadtest/resultados/local*
