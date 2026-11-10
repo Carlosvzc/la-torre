@@ -586,6 +586,7 @@ function conectar() {
   miId = $("nombre").value.trim() || "caballero" + Math.floor(Math.random() * 1000);
   $("nombre").value = miId;
   previo = actual = null; fin = null; elegida = false; avisoVisto = null;
+  vaciarBufer();
   limpiarEntidades();
   ponerEstado("conectando…");
   try { ws = new WebSocket($("url").value.trim()); } catch (e) { ponerEstado("URL inválida"); return; }
@@ -617,6 +618,7 @@ function ocultarJuego() {
   for (const id of ["hud", "hudJefe", "info", "ayuda", "capa"]) $(id).classList.add("oculto");
   $("inicio").classList.remove("oculto");
   limpiarEntidades();
+  vaciarBufer();
   actual = previo = null;
 }
 function limpiarEntidades() {
@@ -629,15 +631,39 @@ function limpiarEntidades() {
 // =====================================================================================
 //  Snapshots y eventos
 // =====================================================================================
-function recibir(snap) {
-  previo = actual; actual = snap; tActual = performance.now();
+// Búfer de interpolación: se dibuja un poco en el pasado (entre dos snapshots que ya llegaron),
+// así los atrasos irregulares de la red no se ven como tirones. Los eventos (golpes, sonidos,
+// números) se disparan cuando su snapshot "llega" a la pantalla, sincronizados con lo que se ve.
+const bufer = [];                                   // { t, snap, listo }
+let horaUltimo = null;
+const retrasoMs = () => (miRol === "espectador" ? 170 : 90);
+const periodoMs = () => (miRol === "espectador" ? 100 : TICK_MS);
+function vaciarBufer() { bufer.length = 0; horaUltimo = null; }
+
+function recibir(snap, llegada = performance.now()) {
+  previo = actual; actual = snap; tActual = llegada;
+  // Hora "ideal" del snapshot: un periodo exacto después del anterior, corregida poco a poco
+  // hacia la hora real de llegada (si se desvía mucho, se re-sincroniza de golpe).
+  const periodo = periodoMs();
+  const esperada = horaUltimo === null ? llegada : horaUltimo + periodo;
+  horaUltimo = Math.abs(llegada - esperada) > 3 * periodo ? llegada : esperada + (llegada - esperada) * 0.1;
+  bufer.push({ t: horaUltimo, snap, listo: false });
+  if (bufer.length > 40) bufer.splice(0, bufer.length - 40);
+  if (snap.estado !== "mejora") elegida = false;
+  actualizarHud(snap);                              // el HUD sí va al día (respuesta inmediata)
+  actualizarCapa(snap);
+}
+
+function procesarVisual(snap, anterior) {
   // Caballeros que entran y salen
   const ids = Object.keys(snap.jugadores).sort();
   ids.forEach((id, i) => {
     if (!caballeros.has(id)) {
       const modelo = crearCaballero(COLORES_JUGADOR[i % COLORES_JUGADOR.length]);
       escena.add(modelo.raiz);
-      caballeros.set(id, { modelo, estado: "libre", tEstado: 0, giro: 0, fase: 0, flash: 0, x: 0, y: 0 });
+      const j = snap.jugadores[id];
+      caballeros.set(id, { modelo, estado: "libre", tEstado: 0, giro: giroHacia(j.dx, j.dy), fase: 0, flash: 0,
+                           golpe: 0, vel: 0, x: j.x, y: j.y });
     }
   });
   for (const [id, c] of caballeros) if (!snap.jugadores[id]) { escena.remove(c.modelo.raiz); caballeros.delete(id); }
@@ -658,7 +684,8 @@ function recibir(snap) {
       const modelo = crearJefe(snap.jefe.id);
       modelo.raiz.scale.setScalar(snap.jefe.radio);
       escena.add(modelo.raiz);
-      jefeVista = { clave, modelo, estado: snap.jefe.estado, tEstado: performance.now(), giro: 0, flash: 0, aparicion: 0, x: snap.jefe.x, y: snap.jefe.y };
+      jefeVista = { clave, modelo, estado: snap.jefe.estado, tEstado: performance.now(), giro: Math.PI, flash: 0,
+                    retroceso: 0, vel: 0, aparicion: 0, x: snap.jefe.x, y: snap.jefe.y };
     }
     const jv = jefeVista;
     if (snap.jefe.estado !== jv.estado) {
@@ -666,9 +693,9 @@ function recibir(snap) {
       jv.estado = snap.jefe.estado; jv.tEstado = performance.now();
     }
     // Embestida: si el jefe salta lejos de un snapshot al otro, deja polvo en el camino
-    if (previo && previo.jefe && Math.hypot(snap.jefe.x - previo.jefe.x, snap.jefe.y - previo.jefe.y) > 1.5) {
+    if (anterior && anterior.jefe && Math.hypot(snap.jefe.x - anterior.jefe.x, snap.jefe.y - anterior.jefe.y) > 1.5) {
       for (let k = 0; k <= 6; k++) {
-        const x = lerp(previo.jefe.x, snap.jefe.x, k / 6), y = lerp(previo.jefe.y, snap.jefe.y, k / 6);
+        const x = lerp(anterior.jefe.x, snap.jefe.x, k / 6), y = lerp(anterior.jefe.y, snap.jefe.y, k / 6);
         particulas.emitir(mundo(x, y, 0.1), 6, 0x7a6a5a, 1.5, { gravedad: 1.5, vida: 0.9 });
       }
     }
@@ -681,10 +708,8 @@ function recibir(snap) {
     avisoAnterior = { ...aviso, tipo: aviso.ataque };
   } else avisoVisto = null;
 
-  if (snap.estado !== "mejora") elegida = false;
   for (const e of snap.eventos) evento(e, snap);
-  actualizarHud(snap);
-  actualizarCapa(snap);
+  if (snap.eventos.some((e) => e.tipo === "fin") && actual) actualizarCapa(actual);
 }
 
 function impactoVisual(aviso) {
@@ -702,14 +727,14 @@ function impactoVisual(aviso) {
 function evento(e, snap) {
   let texto = null;
   if (e.tipo === "golpe" && jefeVista) {
-    jefeVista.flash = 1;
+    jefeVista.flash = 1; jefeVista.retroceso = 1;
     numero(`${Math.round(e.dano)}`, mundo(snap.jefe.x, snap.jefe.y, 2.4 * snap.jefe.radio), "#f1e3c0");
     particulas.emitir(mundo(snap.jefe.x, snap.jefe.y, 1.4), 14, 0xfff0c0, 3, { vida: 0.4 });
     if (e.jugador === miId) { sonido("golpe"); sacudida = Math.max(sacudida, 0.06); }
   } else if (e.tipo === "impacto") {
     const j = snap.jugadores[e.jugador], c = caballeros.get(e.jugador);
     if (j && e.dano > 0) {
-      if (c) c.flash = 1;
+      if (c) { c.flash = 1; c.golpe = 1; }
       numero(`-${Math.round(e.dano)}`, mundo(j.x, j.y, 2.0), "#ff5a4a");
       texto = `${e.ataque} alcanza a ${e.jugador}`;
     } else if (j) {
@@ -927,101 +952,133 @@ function sonido(tipo) {
 // =====================================================================================
 //  Animación de cada cuadro
 // =====================================================================================
-function interp(a, b, alfa, campo) { return a ? lerp(a[campo], b[campo], alfa) : b[campo]; }
+// Cada articulación se acerca a su pose objetivo con un resorte amortiguado (k = rapidez):
+// así las transiciones entre estados (caminar, tajo, voltereta, golpe recibido) nunca saltan.
+const amortiguar = (valor, objetivo, k, dt) => valor + (objetivo - valor) * (1 - Math.exp(-k * dt));
 
-function animarCaballero(c, j, jp, alfa, ahora, dt) {
+function animarCaballero(c, ja, jb, alfa, ahora, dt) {
   const m = c.modelo;
-  const x = interp(jp, j, alfa, "x"), y = interp(jp, j, alfa, "y");
+  const x = lerp(ja.x, jb.x, alfa), y = lerp(ja.y, jb.y, alfa);
   const velocidad = Math.hypot(x - c.x, y - c.y) / Math.max(dt, 1e-3);
   c.x = x; c.y = y;
+  c.vel = amortiguar(c.vel, ja.estado === "esquivando" ? 0 : velocidad, 10, dt);
   m.raiz.position.copy(mundo(x, y));
-  c.giro = lerpAngulo(c.giro, giroHacia(j.dx, j.dy), 1 - Math.exp(-dt * 14));
+  const dx = lerp(ja.dx, jb.dx, alfa), dy = lerp(ja.dy, jb.dy, alfa);
+  if (Math.abs(dx) + Math.abs(dy) > 1e-3) c.giro = lerpAngulo(c.giro, giroHacia(dx, dy), 1 - Math.exp(-dt * 16));
   m.raiz.rotation.y = c.giro;
-  const t = (ahora - c.tEstado) / 1000;
-  // valores de reposo
-  m.giro.rotation.set(0, 0, 0); m.giro.position.y = 0.6;
-  m.brazoD.rotation.set(-0.35, 0, 0); m.brazoI.rotation.set(0, 0, 0);
-  const paso = limitar(velocidad / 5, 0, 1);
-  c.fase += dt * (4 + 8 * paso);
-  m.piernaI.rotation.x = Math.sin(c.fase) * 0.7 * paso;
-  m.piernaD.rotation.x = -Math.sin(c.fase) * 0.7 * paso;
-  m.brazoI.rotation.x = -Math.sin(c.fase) * 0.4 * paso;
-  m.giro.position.y = 0.6 + Math.abs(Math.sin(c.fase)) * 0.05 * paso + Math.sin(ahora / 500) * 0.01;
-  m.capa.rotation.x = 0.15 + paso * 0.5 + Math.sin(ahora / 300) * 0.05;
 
-  if (j.estado === "atacando") {                 // preparación 0.30 s, tajo, recuperación hasta 0.55 s
-    let a;
-    if (t < 0.28) a = lerp(-0.35, -3.6, salida(t / 0.28));
-    else if (t < 0.36) a = lerp(-3.6, -0.6, (t - 0.28) / 0.08);
-    else a = lerp(-0.6, -0.35, limitar((t - 0.36) / 0.2, 0, 1));
-    m.brazoD.rotation.x = a;
-    m.giro.rotation.y = t < 0.28 ? -0.35 * salida(t / 0.28) : lerp(-0.35, 0.3, limitar((t - 0.28) / 0.1, 0, 1));
-  } else if (j.estado === "esquivando") {        // voltereta
-    const p = limitar(t / 0.4, 0, 1);
-    m.giro.rotation.x = p * Math.PI * 2;
-    m.giro.position.y = 0.6 - Math.sin(p * Math.PI) * 0.3;
-  } else if (j.estado === "muerto") {
-    const p = suave(limitar(t / 0.7, 0, 1));
-    m.giro.rotation.x = -p * Math.PI / 2 * 0.95;
-    m.giro.position.y = 0.6 - p * 0.42;
+  const t = (ahora - c.tEstado) / 1000;
+  const paso = limitar(c.vel / 5, 0, 1);
+  const fasePrevia = c.fase;
+  c.fase += dt * (3 + 9 * paso);
+  if (paso > 0.5 && Math.floor(fasePrevia / Math.PI) !== Math.floor(c.fase / Math.PI)) {
+    particulas.emitir(mundo(x, y, 0.05), 2, 0x5a5048, 0.6, { gravedad: 1, vida: 0.5 });   // polvo al pisar
   }
-  // destello rojo al recibir daño
-  c.flash = Math.max(0, c.flash - dt * 5);
+  c.golpe = Math.max(0, c.golpe - dt * 4);
+
+  // Pose objetivo: respirar, caminar e inclinarse al correr
+  const pose = {
+    rotX: 0.1 * paso - 0.4 * c.golpe, rotY: 0,
+    alto: 0.6 + Math.abs(Math.sin(c.fase)) * 0.06 * paso + Math.sin(ahora / 600) * 0.012 - 0.05 * c.golpe,
+    brazoD: -0.35 + Math.sin(c.fase) * 0.25 * paso + Math.sin(ahora / 700) * 0.03,
+    brazoI: -Math.sin(c.fase) * 0.5 * paso,
+    piernaI: Math.sin(c.fase) * 0.75 * paso, piernaD: -Math.sin(c.fase) * 0.75 * paso,
+    capa: 0.12 + paso * 0.6 + Math.sin(ahora / 320) * 0.05 + Math.sin(c.fase * 2) * 0.05 * paso,
+  };
+  let kBrazo = 16, kCuerpo = 12;
+  if (ja.estado === "atacando") {                 // carga 0.28 s, tajo en 0.08 s, recuperación
+    if (t < 0.28) pose.brazoD = lerp(-0.35, -3.6, salida(t / 0.28));
+    else if (t < 0.36) pose.brazoD = lerp(-3.6, -0.6, (t - 0.28) / 0.08);
+    else pose.brazoD = lerp(-0.6, -0.35, limitar((t - 0.36) / 0.2, 0, 1));
+    pose.rotY = t < 0.28 ? -0.35 * salida(t / 0.28) : lerp(-0.35, 0.3, limitar((t - 0.28) / 0.1, 0, 1));
+    pose.rotX = t < 0.28 ? -0.08 : 0.2;           // se echa atrás al cargar y se lanza al tajar
+    pose.piernaI = t < 0.28 ? -0.2 : 0.45; pose.piernaD = t < 0.28 ? 0.2 : -0.3;   // paso adelante
+    kBrazo = 45; kCuerpo = 25;
+  } else if (ja.estado === "muerto") {
+    pose.rotX = -Math.PI / 2 * 0.95; pose.alto = 0.18; pose.brazoD = -1.2; pose.brazoI = -1.2;
+    kCuerpo = 7;
+  }
+
+  if (ja.estado === "esquivando") {               // voltereta: va directa (no se amortigua el giro)
+    const q = suave(limitar(t / 0.4, 0, 1));
+    m.giro.rotation.x = q * Math.PI * 2;
+    m.giro.position.y = 0.6 - Math.sin(q * Math.PI) * 0.32;
+    pose.piernaI = pose.piernaD = -1.2; pose.brazoD = pose.brazoI = -1.0;     // se encoge
+  } else {
+    if (m.giro.rotation.x > Math.PI) m.giro.rotation.x -= Math.PI * 2;      // termina la vuelta sin desandarla
+    m.giro.rotation.x = amortiguar(m.giro.rotation.x, pose.rotX, kCuerpo, dt);
+    m.giro.position.y = amortiguar(m.giro.position.y, pose.alto, 14, dt);
+  }
+  m.giro.rotation.y = amortiguar(m.giro.rotation.y, pose.rotY, kCuerpo, dt);
+  m.brazoD.rotation.x = amortiguar(m.brazoD.rotation.x, pose.brazoD, kBrazo, dt);
+  m.brazoI.rotation.x = amortiguar(m.brazoI.rotation.x, pose.brazoI, 14, dt);
+  m.piernaI.rotation.x = amortiguar(m.piernaI.rotation.x, pose.piernaI, 18, dt);
+  m.piernaD.rotation.x = amortiguar(m.piernaD.rotation.x, pose.piernaD, 18, dt);
+  m.capa.rotation.x = amortiguar(m.capa.rotation.x, pose.capa, 5, dt);      // la capa va con retraso
+
+  c.flash = Math.max(0, c.flash - dt * 5);        // destello rojo al recibir daño
   for (const mt of m.mats) mt.emissive.setRGB(c.flash * 0.7, 0, 0);
 }
 
-function animarJefe(jv, jb, ja, alfa, ahora, dt) {
-  const m = jv.modelo, r = jb.radio;
-  const x = interp(ja, jb, alfa, "x"), y = interp(ja, jb, alfa, "y");
+function animarJefe(jv, ja, jb, alfa, aviso, ahora, dt) {
+  const m = jv.modelo, r = ja.radio;
+  const x = lerp(ja.x, jb.x, alfa), y = lerp(ja.y, jb.y, alfa);
   const velocidad = Math.hypot(x - jv.x, y - jv.y) / Math.max(dt, 1e-3);
   jv.x = x; jv.y = y;
+  jv.vel = amortiguar(jv.vel, velocidad > 15 ? jv.vel : velocidad, 8, dt);   // ignora el salto de la embestida
   jv.aparicion = Math.min(1, jv.aparicion + dt / 1.2);
   m.raiz.position.copy(mundo(x, y, (salida(jv.aparicion) - 1) * 2.5 * r));     // surge del suelo
   // mira hacia donde va a golpear, o hacia el caballero más cercano
   let objetivo = null;
-  if (jb.aviso && jb.aviso.zonas.length) {
-    const [zx, zy] = jb.aviso.zonas[0];
-    if (Math.hypot(zx - jb.x, zy - jb.y) > 0.3) objetivo = [zx - jb.x, zy - jb.y];
+  if (aviso && aviso.zonas.length) {
+    const [zx, zy] = aviso.zonas[0];
+    if (Math.hypot(zx - ja.x, zy - ja.y) > 0.3) objetivo = [zx - ja.x, zy - ja.y];
   }
-  if (!objetivo && actual) {
+  if (!objetivo) {
     let mejor = Infinity;
-    for (const j of Object.values(actual.jugadores)) {
-      const d = Math.hypot(j.x - jb.x, j.y - jb.y);
-      if (j.estado !== "muerto" && d < mejor) { mejor = d; objetivo = [j.x - jb.x, j.y - jb.y]; }
+    for (const c of caballeros.values()) {
+      const d = Math.hypot(c.x - x, c.y - y);
+      if (c.estado !== "muerto" && d < mejor) { mejor = d; objetivo = [c.x - x, c.y - y]; }
     }
   }
-  if (objetivo && jb.estado !== "recuperando") jv.giro = lerpAngulo(jv.giro, giroHacia(objetivo[0], objetivo[1]), 1 - Math.exp(-dt * 5));
+  if (objetivo && ja.estado !== "recuperando") jv.giro = lerpAngulo(jv.giro, giroHacia(objetivo[0], objetivo[1]), 1 - Math.exp(-dt * 5));
   m.raiz.rotation.y = jv.giro;
 
-  const t = (ahora - jv.tEstado) / 1000, paso = limitar(velocidad / 3, 0, 1);
-  m.giro.position.y = Math.abs(Math.sin(ahora / 180)) * 0.08 * paso + (m.tipo === "bruja" ? 0.25 + Math.sin(ahora / 400) * 0.1 : 0);
-  m.giro.rotation.set(0, 0, 0);
-  m.giro.scale.set(1, 1 + Math.sin(ahora / 450) * 0.02, 1);
-  let brilloOjos = 1;
-  if (jb.estado === "preparando" && jb.aviso && avisoVisto) {
-    const p = 1 - limitar(jb.aviso.en / avisoVisto.total, 0, 1);
-    m.arma.rotation.x = lerp(m.reposo, m.alzado, salida(p));
-    m.giro.rotation.x = m.tipo === "sabueso" ? 0.25 * p : -0.18 * p;
-    if (m.tipo === "sabueso") m.giro.position.y -= 0.2 * p;
-    brilloOjos = 1 + 3 * p;
-    for (const mt of m.mats) mt.emissive.setRGB(0.35 * p, 0.05 * p, 0);
+  const t = (ahora - jv.tEstado) / 1000, paso = limitar(jv.vel / 3, 0, 1);
+  jv.retroceso = Math.max(0, jv.retroceso - dt * 5);
+  const pose = {
+    arma: m.reposo + Math.sin(ahora / 600) * 0.05,
+    rotX: 0.06 * paso - 0.1 * jv.retroceso,
+    alto: Math.abs(Math.sin(ahora / 180)) * 0.08 * paso + (m.tipo === "bruja" ? 0.25 + Math.sin(ahora / 400) * 0.1 : 0),
+  };
+  let kArma = 8, brilloOjos = 1, rojo = 0;
+  if (ja.estado === "preparando" && aviso && avisoVisto) {
+    const p = 1 - limitar(aviso.en / avisoVisto.total, 0, 1);
+    pose.arma = lerp(m.reposo, m.alzado, salida(p));
+    pose.rotX = (m.tipo === "sabueso" ? 0.25 : -0.18) * p;
+    if (m.tipo === "sabueso") pose.alto -= 0.2 * p;
+    brilloOjos = 1 + 3 * p; rojo = p; kArma = 14;
     // la lluvia de ceniza: meteoros que caen justo antes del impacto
-    if (jb.aviso.ataque.includes("lluvia") && jb.aviso.en < 0.5 && !avisoVisto.meteoros) {
+    if (aviso.ataque.includes("lluvia") && aviso.en < 0.5 && !avisoVisto.meteoros) {
       avisoVisto.meteoros = true;
-      for (const [zx, zy] of jb.aviso.zonas) particulas.emitir(mundo(zx, zy, 7), 30, 0xff8a2a, 0.6, { radio: 0.6, gravedad: 30, subir: -1, vida: 0.7 });
+      for (const [zx, zy] of aviso.zonas) particulas.emitir(mundo(zx, zy, 7), 30, 0xff8a2a, 0.6, { radio: 0.6, gravedad: 30, subir: -1, vida: 0.7 });
     }
-  } else if (jb.estado === "recuperando") {        // tras el golpe: ventana para castigarlo
-    m.arma.rotation.x = lerp(m.golpe, m.reposo, limitar(t / 0.9, 0, 1));
-    m.giro.rotation.x = 0.15 * (1 - limitar(t / 0.9, 0, 1));
-    for (const mt of m.mats) mt.emissive.setRGB(0, 0, 0);
-  } else if (jb.estado === "muerto") {
-    m.giro.rotation.x = 0;
-  } else {
-    m.arma.rotation.x = lerp(m.arma.rotation.x, m.reposo + Math.sin(ahora / 600) * 0.05, 1 - Math.exp(-dt * 6));
-    for (const mt of m.mats) mt.emissive.setRGB(0, 0, 0);
+  } else if (ja.estado === "recuperando") {        // golpe seco y luego se recupera despacio
+    pose.arma = lerp(m.golpe, m.reposo, limitar((t - 0.15) / 0.8, 0, 1));
+    pose.rotX = 0.15 * (1 - limitar(t / 0.9, 0, 1));
+    kArma = t < 0.12 ? 40 : 10;
+  } else if (ja.estado === "muerto") {
+    pose.rotX = 0;
   }
+  m.arma.rotation.x = amortiguar(m.arma.rotation.x, pose.arma, kArma, dt);
+  m.giro.rotation.x = amortiguar(m.giro.rotation.x, pose.rotX, 10, dt);
+  m.giro.position.y = amortiguar(m.giro.position.y, pose.alto, 10, dt);
+  m.giro.scale.set(1 + 0.03 * jv.retroceso, (1 + Math.sin(ahora / 450) * 0.02) * (1 - 0.05 * jv.retroceso), 1 + 0.03 * jv.retroceso);
   jv.flash = Math.max(0, jv.flash - dt * 8);
-  if (jv.flash > 0) for (const mt of m.mats) mt.emissive.setRGB(jv.flash * 0.8, jv.flash * 0.8, jv.flash * 0.75);
+  for (const mt of m.mats) {
+    if (jv.flash > 0) mt.emissive.setRGB(jv.flash * 0.8, jv.flash * 0.8, jv.flash * 0.75);
+    else mt.emissive.setRGB(0.35 * rojo, 0.05 * rojo, 0);
+  }
   for (const o of m.ojos) { if (!o.userData.base) o.userData.base = o.color.clone(); o.color.copy(o.userData.base).multiplyScalar(brilloOjos); }
 }
 
@@ -1051,8 +1108,7 @@ function marca(i) {
   }
   return marcas[i];
 }
-function dibujarAvisos(ahora) {
-  const a = actual && actual.jefe && actual.jefe.aviso;
+function dibujarAvisos(ahora, a) {
   const zonas = a && avisoVisto ? a.zonas : [];
   zonas.forEach(([zx, zy], i) => {
     const g = marca(i), p = 1 - limitar(a.en / avisoVisto.total, 0, 1);
@@ -1108,16 +1164,37 @@ function cuadro(ahora) {
 function actualizarCuadro(ahora) {
   const dt = Math.min(0.05, (ahora - ultimo) / 1000); ultimo = ahora;
   actualizarMovimiento(ahora);
-  if (actual) {
-    const alfa = limitar((ahora - tActual) / TICK_MS, 0, 1);
-    for (const [id, j] of Object.entries(actual.jugadores)) {
-      const c = caballeros.get(id);
-      if (c) animarCaballero(c, j, previo && previo.jugadores[id], alfa, ahora, dt);
+  let avisoDibujado = null;
+  if (bufer.length) {
+    const hora = ahora - retrasoMs();                 // se dibuja un poco en el pasado
+    // 1. Los snapshots que ya "llegaron" a la pantalla disparan sus eventos, en orden
+    for (let i = 0; i < bufer.length; i++) {
+      const s = bufer[i];
+      if (!s.listo && (s.t <= hora || i === 0)) { s.listo = true; procesarVisual(s.snap, i > 0 ? bufer[i - 1].snap : null); }
     }
-    if (jefeVista && actual.jefe) animarJefe(jefeVista, actual.jefe, previo && previo.jefe, alfa, ahora, dt);
+    // 2. El par (a, b) que rodea la hora de dibujo; si la red se atrasa, se queda en el último
+    let i = 0;
+    while (i < bufer.length - 1 && bufer[i + 1].t <= hora) i++;
+    const a = bufer[i], b = bufer[Math.min(i + 1, bufer.length - 1)];
+    const alfa = b === a ? 1 : limitar((hora - a.t) / Math.max(1, b.t - a.t), 0, 1);
+    const sa = a.snap, sb = b.snap;
+    for (const [id, j] of Object.entries(sa.jugadores)) {
+      const c = caballeros.get(id);
+      if (c) animarCaballero(c, j, sb.jugadores[id] || j, alfa, ahora, dt);
+    }
+    if (jefeVista && sa.jefe && jefeVista.clave === `${sa.piso}-${sa.jefe.id}`) {
+      const mismoJefe = sb.jefe && sb.piso === sa.piso && sb.jefe.id === sa.jefe.id;
+      // el tiempo que falta para el impacto también se interpola: el disco se llena sin escalones
+      if (sa.jefe.aviso) {
+        const avb = mismoJefe && sb.jefe.aviso && JSON.stringify(sb.jefe.aviso.zonas) === JSON.stringify(sa.jefe.aviso.zonas) ? sb.jefe.aviso : null;
+        avisoDibujado = { ...sa.jefe.aviso, en: avb ? lerp(sa.jefe.aviso.en, avb.en, alfa) : Math.max(0, sa.jefe.aviso.en - alfa * periodoMs() / 1000) };
+      }
+      animarJefe(jefeVista, sa.jefe, mismoJefe ? sb.jefe : sa.jefe, alfa, avisoDibujado, ahora, dt);
+    }
+    if (bufer.length > 3 && bufer[1].t < hora - 1000) bufer.splice(0, 1);       // limpia lo viejo
   }
   animarMuertes(dt);
-  dibujarAvisos(ahora);
+  dibujarAvisos(ahora, avisoDibujado);
   for (const l of llamas) {                    // fuego vivo
     const f = 0.8 + Math.sin(ahora / 90 + l.fase) * 0.12 + Math.random() * 0.12;
     l.luz.intensity = 22 * f;
@@ -1140,7 +1217,10 @@ window.laTorre = {
   get estado() { return actual; }, get conexion() { return ws; }, enviar, atacar, esquivar, camara, escena, THREE,
   crearJefe, crearCaballero, renderer,
   // avanza n cuadros a mano (sirve para probar con la pestaña oculta, donde el navegador pausa el dibujo)
-  avanzar(n = 60) { for (let i = 0; i < n; i++) actualizarCuadro(ultimo + 1000 / 60); },
+  avanzar(n = 1) { for (let i = 0; i < n; i++) actualizarCuadro(performance.now()); },
+  get bufer() { return bufer; }, caballeros,
+  // para pruebas controladas de fluidez: snapshots sintéticos con hora de llegada simulada
+  prueba: { recibir, actualizarCuadro, vaciarBufer, limpiarEntidades },
 };
 </script>
 </body>

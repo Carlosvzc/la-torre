@@ -40,6 +40,18 @@ Cooperativo: varias pestañas o PCs en la misma red (cambia `localhost` por la I
 - **Números:** blancos = daño al jefe, rojos = daño recibido, azules = esquiva.
 - Los caballeros cooperativos tienen colores distintos (rojo, azul, morado, verde).
 
+## Fluidez
+- **Búfer de interpolación:** se dibuja ~90 ms en el pasado (170 ms como espectador), entre dos
+  snapshots que ya llegaron y con horas regulares. Los eventos (golpes, números, sonidos) se disparan
+  cuando su snapshot llega a la pantalla. Prueba controlada (caballero a 5 u/s, red con la
+  irregularidad medida, 60 fps): velocidad dibujada **4.9–5.0 u/s** (antes 2.5–8.1 u/s).
+- **Poses amortiguadas:** cada articulación se acerca a su pose con un resorte (rápido en el tajo,
+  lento en la capa); retroceso al recibir golpes, polvo al pisar, golpe seco del jefe.
+
+> Si Docker Desktop está abierto y existe un contenedor viejo del servidor publicando el puerto
+> 7654, se queda con `localhost` y el cliente habla con código antiguo. Revisa con
+> `docker ps` y bórralo (`docker rm -f <nombre>`) antes de correr el servidor con Python.
+
 ## Modelos
 | Jefe | Diseño |
 |---|---|
