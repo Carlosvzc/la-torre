@@ -218,7 +218,9 @@ música ni diseños reconocibles de Nintendo o FromSoftware. Caballero, jefes y 
 - [x] Modo espectador (cámara orbital) y modo pixelado (`P`)
 - [x] 4 clases (Caballero, Bárbaro, Cazadora, Hechicero): servidor, 21 pruebas, modelos, animaciones,
       efectos y HUD; balance medido (las 4 ganan 10/10 con el bot)
+- [x] Modos: Solitario, Solo con bots (2 compañeros IA) y Multijugador de hasta 3 en red local
 - [ ] Probarlo jugando tú (balance, sensación de control) y ajustar
+- [ ] Probar el multijugador con 3 PCs reales (firewall, Wi-Fi)
 - [ ] Reentrenar el bot de 3.1 si hace falta: se entrenó con el caballero anterior (100 vida, 15 daño)
 
 ## 5. Decisiones pendientes

@@ -46,7 +46,7 @@ Start-Sleep -Milliseconds 500
 Escribir "Arrancando el servidor del juego..."
 $servidor = Start-Process $python -ArgumentList "`"$(Join-Path $raiz 'server\server.py')`"" -WorkingDirectory (Join-Path $raiz "server") `
     -WindowStyle Hidden -PassThru -RedirectStandardOutput "$logs\servidor-salida.log" -RedirectStandardError "$logs\servidor.log"
-$pagina = Start-Process $python -ArgumentList "`"$(Join-Path $raiz 'scripts\servir_cliente.py')`"", "8080" `
+$pagina = Start-Process $python -ArgumentList "`"$(Join-Path $raiz 'scripts\servir_cliente.py')`"", "8080", "0.0.0.0" `
     -WindowStyle Hidden -PassThru -RedirectStandardOutput "$logs\pagina-salida.log" -RedirectStandardError "$logs\pagina.log"
 
 # 3. Esperar a que respondan, y comprobar que contesta ESTE servidor (no uno viejo)
@@ -79,8 +79,17 @@ Escribir "    Juego 3D ........ http://localhost:8080/retro/"
 Escribir "    Cliente 2D ...... http://localhost:8080/prueba2d/"
 Escribir "    Métricas ........ http://localhost:9100/metrics"
 Escribir "    Registros ....... $logs"
+# Dirección en la red local para el multijugador (la de la interfaz con salida a internet)
+$ipLan = (Get-NetIPConfiguration -ErrorAction SilentlyContinue | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq "Up" } |
+          Select-Object -First 1).IPv4Address.IPAddress
+if ($ipLan) {
+    Escribir ""
+    Escribir "  Multijugador: tus amigos (misma red) abren en su navegador:" "Cyan"
+    Escribir "    http://$($ipLan):8080/retro/" "Cyan"
+    Escribir "  Si no conectan, permite Python en el Firewall de Windows (solo redes privadas)." "DarkGray"
+}
 Escribir ""
-Escribir "  Para jugar en cooperativo, abre más pestañas con nombres distintos." "DarkGray"
+Escribir "  Elige el modo en la pantalla de inicio: Solitario, Solo con bots o Multijugador." "DarkGray"
 Escribir ""
 Read-Host "  Pulsa Enter para APAGAR el juego"
 

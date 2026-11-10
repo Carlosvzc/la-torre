@@ -53,7 +53,7 @@
   #info { position: fixed; right: 18px; top: 16px; text-align: right; color: var(--tenue); font-size: 12px; pointer-events: none; }
   #info .piso { font-family: Cinzel, Georgia, serif; font-size: 16px; color: var(--oro); }
   #ayuda { position: fixed; right: 18px; bottom: 14px; color: #6f675e; font-size: 12px; text-align: right; pointer-events: none; }
-  #eventos { position: fixed; left: 20px; top: 175px; width: 340px; font-size: 13px; pointer-events: none;
+  #eventos { position: fixed; left: 20px; bottom: 96px; width: 340px; font-size: 13px; pointer-events: none;
              display: flex; flex-direction: column; gap: 2px; }
   #eventos div { color: #c9c0b2; text-shadow: 0 1px 2px #000; animation: desvanecer 6s forwards; }
   @keyframes desvanecer { 0%, 70% { opacity: 1 } 100% { opacity: 0 } }
@@ -89,6 +89,18 @@
   .clase small { color: var(--tenue); display: block; font-size: 12px; line-height: 1.45; }
   .clase small b { display: inline; font: inherit; font-weight: 700; color: var(--oro); }
   .clase .stats { display: flex; gap: 6px; margin-top: 8px; font-size: 11px; color: #8c8378; }
+  /* Modo de juego */
+  .modos { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .modo { padding: 8px 14px; background: var(--panel); border: 1px solid #3a3024; cursor: pointer; text-align: center; min-width: 170px; }
+  .modo:hover { border-color: var(--oro-tenue); }
+  .modo.elegido { border-color: var(--oro); box-shadow: 0 0 14px rgba(216,180,106,.2); }
+  .modo b { font-family: Cinzel, Georgia, serif; color: var(--oro); display: block; }
+  .modo small { color: var(--tenue); font-size: 12px; }
+  /* Sala de espera del grupo */
+  .sala { min-width: 320px; background: var(--panel); border: 1px solid #3a3024; padding: 12px 18px; text-align: left; }
+  .sala div { padding: 4px 0; display: flex; justify-content: space-between; gap: 18px; }
+  .sala .listo { color: #7fd18b; } .sala .esperando { color: var(--tenue); } .sala .vacio { color: #5a534b; font-style: italic; }
+  .invitar { color: var(--tenue); font-size: 13px; } .invitar code { color: var(--oro); font-size: 14px; user-select: all; }
   /* Habilidad en el HUD */
   #habilidad { display: flex; align-items: center; gap: 8px; margin-top: 2px; font-size: 13px; }
   #habilidad .caja { position: relative; width: 34px; height: 34px; border: 1px solid var(--oro-tenue); background: rgba(0,0,0,.6);
@@ -111,8 +123,9 @@
   <h1 class="titulo">LA TORRE</h1>
   <p>Cuatro jefes. Una subida. Ninguna segunda oportunidad.</p>
   <div class="clases" id="clases"></div>
+  <div class="modos" id="modos"></div>
   <div class="formulario">
-    <input id="url" value="ws://localhost:7654" size="20" aria-label="Servidor">
+    <input id="url" value="" size="20" aria-label="Servidor">
     <input id="nombre" placeholder="tu nombre" size="12" maxlength="24" aria-label="Nombre">
     <select id="rol" aria-label="Rol"><option value="jugador">Jugador</option><option value="espectador">Espectador</option></select>
     <button id="botonEntrar">Entrar</button>
@@ -733,6 +746,30 @@ function dibujarClases() {
   };
 }
 dibujarClases();
+
+// Modo de juego: el primero en entrar a un servidor decide el tipo de partida
+const MODOS_UI = {
+  solo:  { nombre: "Solitario", texto: "Tú solo contra la torre" },
+  bots:  { nombre: "Solo con bots", texto: "Tú + 2 compañeros IA" },
+  grupo: { nombre: "Multijugador", texto: "Hasta 3 personas en red local" },
+};
+let modoElegido = "solo";
+try { modoElegido = localStorage.getItem("laTorre.modo") || "solo"; } catch (e) { /* sin almacenamiento */ }
+if (!MODOS_UI[modoElegido]) modoElegido = "solo";
+function dibujarModos() {
+  $("modos").innerHTML = Object.entries(MODOS_UI).map(([id, m]) =>
+    `<div class="modo${id === modoElegido ? " elegido" : ""}" data-modo="${id}"><b>${m.nombre}</b><small>${m.texto}</small></div>`).join("");
+  for (const el of document.querySelectorAll(".modo")) el.onclick = () => {
+    modoElegido = el.dataset.modo;
+    try { localStorage.setItem("laTorre.modo", modoElegido); } catch (e) { /* sin almacenamiento */ }
+    dibujarModos();
+  };
+}
+dibujarModos();
+// El servidor del juego es la misma máquina que sirve la página: así los amigos que abren
+// http://IP-de-tu-PC:8080/retro/ se conectan solos, sin escribir nada.
+$("url").value = `ws://${location.hostname || "localhost"}:7654`;
+let direccionLan = null;
 let previo = null, actual = null, tActual = 0, rtt = null, fin = null, elegida = false;
 let avisoVisto = null, avisoAnterior = null;
 const caballeros = new Map();            // id → { modelo, estadoPrevio, tEstado, ... }
@@ -758,11 +795,11 @@ function conectar() {
   ponerEstado("conectando…");
   try { ws = new WebSocket($("url").value.trim()); } catch (e) { ponerEstado("URL inválida"); return; }
   const este = ws;
-  ws.onopen = () => este.send(JSON.stringify({ hola: { id: miId, rol: miRol, clase: claseElegida } }));
+  ws.onopen = () => este.send(JSON.stringify({ hola: { id: miId, rol: miRol, clase: claseElegida, sala: modoElegido } }));
   ws.onmessage = (m) => {
     const d = JSON.parse(m.data);
     if ("pong" in d) { rtt = performance.now() - d.pong; return; }
-    if (d.bienvenida) { catalogo = d.bienvenida.clases || {}; reintentos = 0; mostrarJuego(); return; }
+    if (d.bienvenida) { catalogo = d.bienvenida.clases || {}; direccionLan = d.bienvenida.direccion_lan || null; reintentos = 0; mostrarJuego(); return; }
     if ("estado" in d) recibir(d);
   };
   ws.onclose = (e) => {
@@ -1093,10 +1130,22 @@ function actualizarCapa(s) {
     return;
   }
   finMostrado = false;
-  if (s.estado === "esperando") {
-    const listo = miRol === "jugador" ? "Pulsa <kbd>Enter</kbd> cuando estés listo" : "Esperando a los jugadores…";
-    return mostrarCapa(`<h2 class="titulo">La torre aguarda</h2><p>${listo}<br><span style="color:var(--tenue)">La subida empieza sola en ${s.inicio_en.toFixed(0)} s</span></p>`);
+  if (s.estado === "esperando" && s.sala === "grupo") {
+    // Sala del grupo: quién está, con qué clase y si ya está listo
+    const listos = new Set(s.listos || []);
+    const filas = Object.entries(s.jugadores).map(([id, j]) =>
+      `<div><span>${esc(id)}${id === miId ? " (tú)" : ""} · ${esc((catalogo[j.clase] || {}).nombre || j.clase)}</span>` +
+      `<span class="${listos.has(id) ? "listo" : "esperando"}">${listos.has(id) ? "✓ listo" : "esperando…"}</span></div>`);
+    for (let k = filas.length; k < (s.max || 3); k++) filas.push(`<div class="vacio">lugar libre</div>`);
+    const yoListo = listos.has(miId);
+    const invitar = direccionLan
+      ? `<p class="invitar">Tus amigos entran desde su navegador en<br><code>http://${esc(direccionLan)}:8080/retro/</code><br>(misma red Wi-Fi o cable)</p>` : "";
+    return mostrarCapa(`<h2 class="titulo">Sala del grupo · ${Object.keys(s.jugadores).length}/${s.max || 3}</h2>` +
+      `<div class="sala">${filas.join("")}</div>` +
+      `<p>${miRol !== "jugador" ? "Esperando a los jugadores…" : yoListo ? "Esperando a que los demás estén listos…" : "Pulsa <kbd>Enter</kbd> cuando estés listo"}<br>` +
+      `<span style="color:var(--tenue)">La subida empieza cuando todos estén listos (o sola en ${s.inicio_en.toFixed(0)} s)</span></p>${invitar}`);
   }
+  if (s.estado === "esperando") return mostrarCapa(`<h2 class="titulo">La torre aguarda…</h2>`);
   if (s.estado === "mejora" && miRol === "jugador") {
     const ofertas = (s.ofertas || {})[miId] || [];
     if (elegida) return mostrarCapa(`<h2 class="titulo">Bendición aceptada</h2><p style="color:var(--tenue)">Esperando a los demás… ${s.elegir_en.toFixed(0)} s</p>`);

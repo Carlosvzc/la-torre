@@ -44,7 +44,7 @@ from estrategia import decidir
 SERVIDOR_WS = os.getenv("SERVIDOR_WS", "")
 ALLOCATOR_IP = os.getenv("ALLOCATOR_IP", "")
 FLOTA = os.getenv("FLOTA", "torre-fleet")
-GRUPO = max(1, min(4, int(os.getenv("JUGADORES_POR_RUN", "2"))))
+GRUPO = max(1, min(3, int(os.getenv("JUGADORES_POR_RUN", "2"))))   # el servidor admite hasta 3
 HABILIDAD = float(os.getenv("HABILIDAD", "0.85"))
 ESPECTAR = [u.strip() for u in os.getenv("ESPECTAR", "").split(",") if u.strip()]
 CLASE = os.getenv("CLASE", "mezcla")          # una clase fija o "mezcla" (cada bot elige al azar)
@@ -143,7 +143,9 @@ class Jugador(User):
         t0 = time.perf_counter()
         try:
             ws = create_connection(url, timeout=10)
-            ws.send(json.dumps({"hola": {"id": self.id, "rol": "jugador", "clase": self.clase}}))
+            # un jugador por run = solitario; si no, multijugador (el grupo se junta en la sala)
+            sala = "solo" if GRUPO == 1 else "grupo"
+            ws.send(json.dumps({"hola": {"id": self.id, "rol": "jugador", "clase": self.clase, "sala": sala}}))
             bienvenida = recibir_mensaje(ws)
             if "bienvenida" not in bienvenida:
                 raise WebSocketException(f"respuesta inesperada: {bienvenida}")

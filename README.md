@@ -19,7 +19,14 @@ El plan completo y el avance están en [PLAN.md](PLAN.md).
 
   Balance medido con el bot (10 semillas, reflejos perfectos): las 4 clases ganan 10/10; runs de 3.3 a 5.7 min.
 - 4 jefes por run; al vencer a cada uno, el servidor ofrece 3 mejoras al azar.
-- Solo o cooperativo de 2 a 4 jugadores. La run termina en victoria (4 jefes) o derrota (todos caídos).
+- **3 modos** (los elige el primero en entrar): **Solitario**; **Solo con bots** (tú + 2 compañeros
+  IA dentro del servidor, con clases distintas a la tuya); **Multijugador** de hasta 3 personas en la
+  red local (sala de espera: empieza cuando todos pulsan Enter, o a los 60 s). La run termina en
+  victoria (4 jefes) o derrota (todos caídos). Medido: un jugador con errores gana 0/8 en solitario
+  y 8/8 con bots.
+- **Multijugador en red local:** el acceso del escritorio muestra la dirección para tus amigos
+  (`http://IP-de-tu-PC:8080/retro/`); ellos solo abren esa página. La primera vez Windows pide
+  permitir Python en el firewall: acepta solo **redes privadas**.
 
 ## Jugar con un doble clic
 

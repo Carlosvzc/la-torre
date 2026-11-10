@@ -5,7 +5,9 @@ una versión anterior del juego después de actualizarlo. Este servidor añade
 `Cache-Control: no-cache`: el navegador pregunta cada vez si cambió (si no, responde 304 al
 instante) y nunca muestra una versión vieja.
 
-Uso:  python scripts/servir_cliente.py [puerto]
+Uso:  python scripts/servir_cliente.py [puerto] [interfaz]
+      interfaz 127.0.0.1 (solo esta PC, por defecto) o 0.0.0.0 (también la red local, para
+      que tus amigos abran http://IP-de-tu-PC:8080/retro/ en el multijugador)
 """
 import functools
 import http.server
@@ -26,9 +28,10 @@ class SinCacheVieja(http.server.SimpleHTTPRequestHandler):
 
 def main():
     puerto = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+    interfaz = sys.argv[2] if len(sys.argv) > 2 else "127.0.0.1"
     manejador = functools.partial(SinCacheVieja, directory=RAIZ)
-    with http.server.ThreadingHTTPServer(("127.0.0.1", puerto), manejador) as servidor:
-        print(f"Sirviendo {RAIZ} en http://localhost:{puerto}/ (sin caché vieja)", flush=True)
+    with http.server.ThreadingHTTPServer((interfaz, puerto), manejador) as servidor:
+        print(f"Sirviendo {RAIZ} en {interfaz}:{puerto} (sin caché vieja)", flush=True)
         servidor.serve_forever()
 
 

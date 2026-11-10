@@ -50,12 +50,18 @@
 <header>
   <h1>LA TORRE · cliente de pruebas</h1>
   <input id="url" value="ws://localhost:7654" size="22" aria-label="Servidor">
+  <script>document.getElementById("url").value = `ws://${location.hostname || "localhost"}:7654`;</script>
   <input id="nombre" placeholder="tu nombre" size="12" aria-label="Nombre">
   <select id="clase" aria-label="Clase">
     <option value="caballero">Caballero</option>
     <option value="barbaro">Bárbaro</option>
     <option value="cazadora">Cazadora</option>
     <option value="hechicero">Hechicero</option>
+  </select>
+  <select id="sala" aria-label="Modo">
+    <option value="solo">Solitario</option>
+    <option value="bots">Solo con bots</option>
+    <option value="grupo">Multijugador (hasta 3)</option>
   </select>
   <select id="rol" aria-label="Rol">
     <option value="jugador">Jugador</option>
@@ -136,7 +142,7 @@ function conectar() {
   try { ws = new WebSocket($("url").value.trim()); }
   catch (e) { ponerEstado("URL inválida"); return; }
   const este = ws;
-  ws.onopen = () => este.send(JSON.stringify({ hola: { id: miId, rol: miRol, clase: $("clase").value } }));
+  ws.onopen = () => este.send(JSON.stringify({ hola: { id: miId, rol: miRol, clase: $("clase").value, sala: $("sala").value } }));
   ws.onmessage = (m) => {
     const d = JSON.parse(m.data);
     if ("pong" in d) { rtt = performance.now() - d.pong; return; }
