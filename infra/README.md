@@ -44,3 +44,13 @@ crea `la-torre-prod`.
 
 ## Validado sin nube
 `terraform init -backend=false && terraform validate` → *Success! The configuration is valid.*
+
+## Apagar sin dejar huérfanos (lo aprendido el 16/11/2026)
+
+1. Borrar primero lo que creó Kubernetes fuera de Terraform: `kubectl delete fleetautoscaler,fleet --all`,
+   `kubectl delete -f k8s/locust.yaml` y `helm uninstall monitoreo -n monitoreo`.
+2. **Desinstalar Agones antes del destroy**: `helm uninstall agones -n agones-system --no-hooks` y
+   `terraform state rm helm_release.agones`. Si Terraform lo intenta, la desinstalación espera a los
+   *finalizers* de Agones, se agota el tiempo y el destroy falla a medias (los nodos siguen vivos con IP
+   públicas y no se puede soltar el Internet Gateway).
+3. `terraform destroy` y luego `scripts/comprobar-huerfanos.ps1`: todo debe salir en "ninguno".

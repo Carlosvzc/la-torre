@@ -27,6 +27,7 @@ PyTorch 2.15.0 (CPU). **GPU:** Google Colab con NVIDIA T4 (pendiente de correr, 
 | Configuración | Dispositivo | Pasos | Tiempo | Pasos/s |
 |---|---|---|---|---|
 | PDF (1 entorno) | CPU local (Ryzen 5 7533HS) | 100 000 | **158.8 s** | 630 |
+| PDF (1 entorno), repetición del 16/11 | CPU local | 100 000 | **160.4 s** | 623 |
 | 8 entornos | CPU local | 1 000 000 | **928.6 s** (15.5 min) | 1 077 |
 | PDF (1 entorno) | CPU de Colab | 100 000 | _pendiente (notebook)_ | |
 | PDF (1 entorno) | GPU T4 de Colab | 100 000 | _pendiente (notebook)_ | |
@@ -66,23 +67,34 @@ coinciden) y es **~28 veces más rápida**. Con una red de 14→64→64→7, el 
 la imagen (que pesaría cientos de MB más).
 
 ## Análisis
-_(Se completa con los tiempos de Colab: ¿la GPU fue más rápida o más lenta que la CPU, y por qué?
-El PDF anticipa que con redes tan pequeñas la GPU puede no ganar porque copiar datos a la GPU
-cuesta más que el cálculo.)_
+La comparación con GPU (Colab T4) **no se corrió**, así que no hay tiempos de GPU que reportar. Lo
+medido apunta a lo que anticipa el PDF: con una red tan pequeña (14→64→64→7), el cuello de botella no
+es el cálculo sino la simulación del entorno y el costo fijo de cada llamada. Por ejemplo, la misma red
+en numpy decide 28 veces más rápido que en PyTorch. Por eso se espera que la GPU no gane, pero queda
+como hipótesis sin medir. El notebook `ia/entrenar_bot_colab.ipynb` está listo para comprobarlo.
 
-## Costo estimado por hora — pendiente de la calculadora oficial
-No se ponen cifras de memoria. En https://cloud.google.com/products/calculator (región
-**us-central1**), cotiza y anota aquí el precio por hora **bajo demanda** y **Spot** de:
+## Costo estimado en AWS (us-east-2)
 
-| Recurso | Para qué | USD/h bajo demanda | USD/h Spot |
-|---|---|---|---|
-| `e2-standard-16` (16 vCPU) | Inferencia con PyTorch (12 vCPU) | | |
-| `e2-standard-2` (2 vCPU) | Inferencia con numpy (1 vCPU) | | |
-| `n1-standard-4` + 1 × NVIDIA T4 | Entrenamiento en GPU | | |
+Precios oficiales consultados el 16/11/2026: bajo demanda con la AWS Price List API y Spot con
+`aws ec2 describe-spot-price-history` (mínimo y máximo de las últimas 24 h, Linux).
 
-Captura: la pantalla de la calculadora con los tres recursos (`docs/capturas/3.1-costos.png`).
-El entrenamiento es ocasional y tolera interrupciones (guarda el modelo), así que va en **Spot**;
-la inferencia corre todo el tiempo junto a las partidas, así que va **bajo demanda**.
+| Recurso | Para qué | USD/h bajo demanda | USD/h Spot (24 h) | USD/mes 24/7 bajo demanda |
+|---|---|---|---|---|
+| `c7i.4xlarge` (16 vCPU, 32 GiB) | Inferencia con PyTorch (12 vCPU) | 0.714 | 0.1784–0.2292 | **521.22** |
+| `c7i.large` (2 vCPU, 4 GiB) | Inferencia con numpy (1 vCPU) | 0.08925 | 0.0203–0.0289 | **65.15** |
+| `g4dn.xlarge` (4 vCPU + 1 NVIDIA T4) | Entrenamiento en GPU | 0.526 | 0.2748–0.28 | — |
+
+- **Servir 2 000 bots:** con PyTorch hacen falta 12 vCPU (USD 521/mes); con la red exportada a numpy,
+  1 vCPU (USD 65/mes en una c7i.large propia). Es **8 veces más barato** con la misma calidad de
+  decisiones. En la práctica, 0.31 vCPU caben en los nodos de juego que ya existen (en la 3.4 cada
+  GameServer usó 18 milinúcleos), así que el costo extra de los bots es casi cero.
+- **Entrenar:** el entrenamiento de 1 000 000 de pasos tardó 928.6 s (0.258 h) en la CPU local de 6
+  núcleos. Suponiendo una velocidad parecida en una `c7i.2xlarge` (8 vCPU, USD 0.357/h), costaría
+  **≈ USD 0.09 por entrenamiento**. La equivalencia de velocidad es una suposición, no una medición.
+  El tiempo en la GPU T4 no se midió (Colab pendiente), así que no se calcula su costo.
+- El entrenamiento es ocasional y tolera interrupciones (guarda el modelo), así que va en **Spot**
+  (47–48 % más barato en la g4dn.xlarge); la inferencia corre todo el tiempo junto a las partidas, así
+  que va **bajo demanda**.
 
 ## Cómo reproducir
 ```powershell
