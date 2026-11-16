@@ -19,9 +19,12 @@ variable "version_kubernetes" {
 }
 
 variable "tipo_nodo" {
+  # El plan gratuito de AWS solo deja lanzar tipos "free-tier-eligible" (c7i-flex.large,
+  # m7i-flex.large, t3/t4g/t8i small y micro). c7i.large fue rechazado al crear los nodos.
+  # c7i-flex.large: optimizada a cómputo, 2 vCPU / 4 GiB, USD 0.08479/h en us-east-2.
   description = "Tipo de instancia de los nodos de juego (optimizada a cómputo)"
   type        = string
-  default     = "c7i.large"
+  default     = "c7i-flex.large"
 }
 
 variable "nodos_min" {
