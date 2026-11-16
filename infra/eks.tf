@@ -13,6 +13,10 @@ module "eks" {
   create_kms_key            = false
   cluster_encryption_config = {}
 
+  # La cuenta del plan gratuito pertenece a una organización de AWS cuya política (SCP)
+  # prohíbe iam:CreateOpenIDConnectProvider, así que no hay IRSA (ver README).
+  enable_irsa = false
+
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.public_subnets
 
@@ -23,6 +27,8 @@ module "eks" {
       desired_size   = var.nodos_deseados
       max_size       = var.nodos_max
       labels         = { rol = "juego" }
+      # Sin IRSA, el Cluster Autoscaler toma los permisos del rol de los nodos
+      iam_role_additional_policies = { autoscaler = aws_iam_policy.autoscaler.arn }
     }
   }
 
@@ -40,19 +46,29 @@ module "eks" {
 }
 
 # Cluster Autoscaler: agrega nodos cuando hay pods pendientes (tercera capa del autoescalado).
-# Usa IRSA: un rol de IAM solo para su cuenta de servicio, sin llaves.
-module "irsa_autoscaler" {
-  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 5.48"
-
-  role_name                        = "${local.nombre}-cluster-autoscaler"
-  attach_cluster_autoscaler_policy = true
-  cluster_autoscaler_cluster_names = [module.eks.cluster_name]
-
-  oidc_providers = {
-    eks = {
-      provider_arn               = module.eks.oidc_provider_arn
-      namespace_service_accounts = ["kube-system:cluster-autoscaler"]
-    }
-  }
+# Lo ideal es IRSA (un rol solo para su cuenta de servicio), pero la SCP de la organización
+# prohíbe crear el proveedor OIDC del clúster. Alternativa: esta política va en el rol de los
+# nodos y las acciones que cambian el tamaño solo valen para grupos con la etiqueta del clúster.
+resource "aws_iam_policy" "autoscaler" {
+  name = "${local.nombre}-cluster-autoscaler"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["autoscaling:DescribeAutoScalingGroups", "autoscaling:DescribeAutoScalingInstances",
+          "autoscaling:DescribeLaunchConfigurations", "autoscaling:DescribeScalingActivities",
+          "autoscaling:DescribeTags", "ec2:DescribeImages", "ec2:DescribeInstanceTypes",
+          "ec2:DescribeLaunchTemplateVersions", "ec2:GetInstanceTypesFromInstanceRequirements",
+        "eks:DescribeNodegroup"]
+        Resource = "*"
+      },
+      {
+        Effect    = "Allow"
+        Action    = ["autoscaling:SetDesiredCapacity", "autoscaling:TerminateInstanceInAutoScalingGroup"]
+        Resource  = "*"
+        Condition = { StringEquals = { "aws:ResourceTag/k8s.io/cluster-autoscaler/${local.nombre}" = "owned" } }
+      }
+    ]
+  })
 }

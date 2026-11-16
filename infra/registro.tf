@@ -12,6 +12,8 @@ resource "aws_ecr_repository" "servidor" {
 
 # GitHub Actions publica en ECR con OIDC: el pipeline pide credenciales temporales,
 # no hay llaves guardadas como secretos (lo que el PDF recomienda para producción).
+# APAGADO por defecto: la SCP de la organización del plan gratuito prohíbe
+# iam:CreateOpenIDConnectProvider. En una cuenta normal: -var=crear_oidc_github=true.
 resource "aws_iam_openid_connect_provider" "github" {
   count           = var.crear_oidc_github ? 1 : 0
   url             = "https://token.actions.githubusercontent.com"
@@ -19,22 +21,14 @@ resource "aws_iam_openid_connect_provider" "github" {
   thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 }
 
-data "aws_iam_openid_connect_provider" "github" {
-  count = var.crear_oidc_github ? 0 : 1
-  url   = "https://token.actions.githubusercontent.com"
-}
-
-locals {
-  oidc_github_arn = var.crear_oidc_github ? aws_iam_openid_connect_provider.github[0].arn : data.aws_iam_openid_connect_provider.github[0].arn
-}
-
 resource "aws_iam_role" "github" {
-  name = "${local.nombre}-github-actions"
+  count = var.crear_oidc_github ? 1 : 0
+  name  = "${local.nombre}-github-actions"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
-      Principal = { Federated = local.oidc_github_arn }
+      Principal = { Federated = aws_iam_openid_connect_provider.github[0].arn }
       Action    = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }
@@ -45,8 +39,9 @@ resource "aws_iam_role" "github" {
 }
 
 resource "aws_iam_role_policy" "github_ecr" {
-  name = "publicar-en-ecr"
-  role = aws_iam_role.github.id
+  count = var.crear_oidc_github ? 1 : 0
+  name  = "publicar-en-ecr"
+  role  = aws_iam_role.github[0].id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [

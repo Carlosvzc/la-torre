@@ -50,9 +50,9 @@ variable "repo_github" {
 }
 
 variable "crear_oidc_github" {
-  description = "false si la cuenta ya tiene el proveedor OIDC de GitHub"
+  description = "Crear el proveedor OIDC de GitHub y el rol de publicación (la SCP del plan gratuito lo prohíbe)"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "correo_alerta" {

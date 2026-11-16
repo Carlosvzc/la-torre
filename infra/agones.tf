@@ -18,7 +18,21 @@ resource "helm_release" "agones" {
   version          = "1.62.0" # soporta Kubernetes 1.34–1.36
   namespace        = "agones-system"
   create_namespace = true
-  depends_on       = [module.eks]
+  timeout          = 900
+
+  # El chart crea por defecto balanceadores de carga (allocator y ping) que cobran por hora
+  # y que "terraform destroy" no borra (los crea Kubernetes, no Terraform). No los usamos:
+  # la asignación se hace con kubectl (GameServerAllocation) y los jugadores entran directo
+  # a la IP pública del nodo y al puerto del GameServer.
+  set {
+    name  = "agones.allocator.service.serviceType"
+    value = "ClusterIP"
+  }
+  set {
+    name  = "agones.ping.install"
+    value = "false"
+  }
+  depends_on = [module.eks]
 }
 
 resource "helm_release" "cluster_autoscaler" {
@@ -39,9 +53,6 @@ resource "helm_release" "cluster_autoscaler" {
     name  = "rbac.serviceAccount.name"
     value = "cluster-autoscaler"
   }
-  set {
-    name  = "rbac.serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-    value = module.irsa_autoscaler.iam_role_arn
-  }
+
   depends_on = [module.eks]
 }
