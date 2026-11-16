@@ -34,6 +34,16 @@ module "eks" {
 
   # Puertos de los GameServers (rango por defecto de Agones) abiertos a internet
   node_security_group_additional_rules = {
+    # El plano de control llama al webhook de Agones (pods agones-extensions, puerto 8081).
+    # Sin esta regla, crear una Fleet falla con "failed calling webhook mutations.agones.dev".
+    agones_webhook = {
+      description                   = "Plano de control hacia el webhook de Agones"
+      protocol                      = "tcp"
+      from_port                     = 8081
+      to_port                       = 8081
+      type                          = "ingress"
+      source_cluster_security_group = true
+    }
     agones_juego = {
       description = "Puertos de juego de Agones (WebSocket sobre TCP)"
       protocol    = "tcp"
