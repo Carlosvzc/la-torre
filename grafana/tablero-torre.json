@@ -1,0 +1,74 @@
+{
+  "__inputs": [
+    { "name": "DS_PROMETHEUS", "label": "Prometheus", "type": "datasource", "pluginId": "prometheus", "pluginName": "Prometheus" }
+  ],
+  "title": "La Torre — jugadores, servidores y autoescalado",
+  "uid": "la-torre",
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": { "from": "now-30m", "to": "now" },
+  "schemaVersion": 39,
+  "tags": ["la-torre", "agones", "unidad-3"],
+  "panels": [
+    {
+      "type": "stat", "title": "Jugadores conectados (CCU)", "gridPos": { "x": 0, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(torre_players_connected)", "refId": "A" }]
+    },
+    {
+      "type": "stat", "title": "Espectadores (CCV)", "gridPos": { "x": 6, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(torre_spectators_connected)", "refId": "A" }]
+    },
+    {
+      "type": "stat", "title": "Nodos del clúster", "gridPos": { "x": 12, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "count(kube_node_info)", "refId": "A" }]
+    },
+    {
+      "type": "stat", "title": "Runs terminadas", "gridPos": { "x": 18, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(torre_runs_total)", "refId": "A" }]
+    },
+    {
+      "type": "timeseries", "title": "CCU en el tiempo", "gridPos": { "x": 0, "y": 5, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "sum(torre_players_connected)", "legendFormat": "jugadores", "refId": "A" },
+        { "expr": "sum(torre_spectators_connected)", "legendFormat": "espectadores", "refId": "B" }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Servidores por estado (Agones)", "gridPos": { "x": 12, "y": 5, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum by (type) (agones_gameservers_count{fleet_name=~\"torre-fleet|jefedia-fleet\"})", "legendFormat": "{{type}}", "refId": "A" }]
+    },
+    {
+      "type": "timeseries", "title": "Duración del tick p99 (ms) — meta < 25 ms (50 % de 50 ms)", "gridPos": { "x": 0, "y": 13, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(torre_tick_seconds_bucket[1m]))) * 1000", "legendFormat": "tick p99", "refId": "A" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(torre_tick_lag_seconds_bucket[1m]))) * 1000", "legendFormat": "retraso del tick p99", "refId": "B" }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Nodos y pods pendientes (Cluster Autoscaler)", "gridPos": { "x": 12, "y": 13, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "count(kube_node_info)", "legendFormat": "nodos", "refId": "A" },
+        { "expr": "sum(kube_pod_status_phase{phase=\"Pending\"})", "legendFormat": "pods pendientes", "refId": "B" }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Egress medido (Mbps) por rol", "gridPos": { "x": 0, "y": 21, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum by (rol) (rate(torre_bytes_sent_total[1m])) * 8 / 1e6", "legendFormat": "{{rol}}", "refId": "A" }]
+    },
+    {
+      "type": "timeseries", "title": "CPU de los GameServers (núcleos)", "gridPos": { "x": 12, "y": 21, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(container_cpu_usage_seconds_total{container=\"torre\"}[1m]))", "legendFormat": "CPU usada", "refId": "A" }]
+    }
+  ]
+}
