@@ -8,6 +8,13 @@ resource "aws_budgets_budget" "alerta" {
   limit_unit   = "USD"
   time_unit    = "MONTHLY"
 
+  # Mide el consumo SIN descontar créditos: en el plan gratuito de AWS el costo neto es 0
+  # (todo sale de los créditos) y una alerta que los descuente nunca avisaría.
+  cost_types {
+    include_credit = false
+    include_refund = false
+  }
+
   notification {
     comparison_operator        = "GREATER_THAN"
     threshold                  = 50
