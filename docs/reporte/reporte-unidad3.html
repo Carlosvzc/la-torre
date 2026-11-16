@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>La Torre — Reporte Unidad 3</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+  :root { --tinta: #1d1d1f; --suave: #555; --linea: #d9d4c7; --oro: #8a6a1f; --fondo: #faf8f3; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: var(--tinta); font-size: 10.2pt; line-height: 1.42; margin: 0; background: #fff; }
+  h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; color: #2a2108; margin: 0; }
+  h2 { font-size: 16pt; border-bottom: 2px solid var(--oro); padding-bottom: 3px; margin: 18px 0 8px; break-after: avoid; }
+  h3 { font-size: 11.5pt; margin: 12px 0 5px; break-after: avoid; }
+  p { margin: 4px 0 7px; }
+  ul { margin: 3px 0 8px; padding-left: 18px; }
+  li { margin: 2px 0; }
+  code { font-family: Consolas, monospace; font-size: 9pt; background: #f1eee6; padding: 0 3px; border-radius: 2px; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 9.2pt; break-inside: avoid; }
+  th, td { border: 1px solid var(--linea); padding: 3px 6px; text-align: left; vertical-align: top; }
+  th { background: #efe9da; }
+  td.n, th.n { text-align: right; white-space: nowrap; }
+  .salto { break-before: page; }
+  .portada { height: 255mm; display: flex; flex-direction: column; justify-content: space-between; }
+  .portada h1 { font-size: 40pt; letter-spacing: 6px; color: #2a2108; }
+  .portada .sub { font-size: 14pt; color: var(--suave); margin-top: 6px; }
+  .portada img { width: 100%; border: 1px solid var(--linea); margin: 14px 0; }
+  .datos td { border: none; padding: 2px 0; font-size: 10.5pt; }
+  .datos td:first-child { color: var(--suave); width: 38%; }
+  figure { margin: 8px 0 12px; break-inside: avoid; }
+  figure img { width: 100%; border: 1px solid var(--linea); display: block; }
+  figcaption { font-size: 8.6pt; color: var(--suave); margin-top: 3px; }
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dos figure, .tres figure { margin: 4px 0; }
+  .tres { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .nota { background: var(--fondo); border-left: 3px solid var(--oro); padding: 6px 10px; margin: 8px 0; font-size: 9.4pt; break-inside: avoid; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0 12px; }
+  .kpi { border: 1px solid var(--linea); padding: 6px 8px; background: var(--fondo); }
+  .kpi b { display: block; font-size: 15pt; font-family: Georgia, serif; color: #2a2108; }
+  .kpi span { font-size: 8.4pt; color: var(--suave); }
+  svg text { font-family: "Segoe UI", Arial, sans-serif; }
+</style>
+</head>
+<body>
+
+<!-- ================= PORTADA ================= -->
+<section class="portada">
+  <div>
+    <p style="color:var(--suave);font-size:10pt;margin:0">Tecnológico Nacional de México · Campus Colima · Ingeniería en Inteligencia Artificial</p>
+    <p style="color:var(--suave);font-size:10pt;margin:0 0 26px">Cómputo en la Nube · Unidad 3: Infraestructura y despliegue de videojuegos en la nube</p>
+    <h1>LA TORRE</h1>
+    <p class="sub">Infraestructura, despliegue, autoescalado y pruebas de carga de un roguelike multijugador con IA en AWS — prácticas 3.1 a 3.6</p>
+    <img src="../capturas/juego-01-menu.png" alt="Menú de La Torre">
+  </div>
+  <table class="datos">
+    <tr><td>Alumno</td><td>Carlos Alejandro Vizcaíno Anguiano</td></tr>
+    <tr><td>Modalidad</td><td>Individual</td></tr>
+    <tr><td>Nube</td><td>Amazon Web Services, región us-east-2 (Ohio)</td></tr>
+    <tr><td>Repositorio</td><td>https://github.com/Carlosvzc/la-torre (privado)</td></tr>
+    <tr><td>Fecha</td><td>16 de noviembre de 2026</td></tr>
+  </table>
+</section>
+
+<!-- ================= 1. EL JUEGO ================= -->
+<h2 class="salto">1. El juego y la adaptación del caso de estudio</h2>
+<p>El material usa como caso <i>Nebula Arena</i> (shooter 5 vs 5). Lo adapté a mi propio juego, <b>La Torre</b>: un roguelike en el que
+un grupo sube una torre de <b>4 pisos con un jefe en cada uno</b>. Entre piso y piso cada jugador elige una mejora
+("bendición"). Todo lo que pasa en el juego lo decide el servidor (<b>servidor autoritativo</b>): el cliente solo manda acciones
+y dibuja el estado que recibe.</p>
+<table>
+  <tr><th>Elemento</th><th>Diseño en La Torre</th><th>Equivalente en Nebula Arena</th></tr>
+  <tr><td>Servidor de partida</td><td>Python 3.11 + WebSocket, 20 ticks/s, snapshots a 10 Hz; SDK de Agones por REST (Ready, Health, Allocate, Shutdown)</td><td>Servidor UDP/WebSocket en EKS + Agones</td></tr>
+  <tr><td>Modos</td><td>Solitario, solo con 2 compañeros IA, y multijugador de hasta 3 en red local</td><td>Partidas 5 vs 5</td></tr>
+  <tr><td>Clases</td><td>Caballero, Bárbaro, Cazadora y Hechicero, cada una con su habilidad</td><td>—</td></tr>
+  <tr><td>Bots con IA</td><td>Bot PPO entrenado contra el primer jefe (3.1) y compañeros IA con estrategia por clase</td><td>Bots por aprendizaje por refuerzo</td></tr>
+  <tr><td>Espectadores</td><td>Rol <code>espectador</code> que recibe los snapshots de una run en curso</td><td>Streaming de partidas</td></tr>
+  <tr><td>Funciones auxiliares</td><td>Tabla de líderes serverless (Lambda + DynamoDB)</td><td>Login, tienda, tabla de líderes</td></tr>
+  <tr><td>Cliente</td><td>Three.js con estilo retro de consola de 64 bits (poligonal, sin texturas realistas; sin recursos de terceros)</td><td>—</td></tr>
+</table>
+<div class="dos">
+  <figure><img src="../capturas/juego-02-combate.png" alt="Combate"><figcaption>Combate contra el Guardián de Hierro (modo solo con bots). Arriba a la derecha, el retraso del servidor: 2 ms.</figcaption></figure>
+  <figure><img src="../capturas/juego-03-mejoras.png" alt="Mejoras"><figcaption>Al vencer al jefe, cada jugador elige una de tres bendiciones antes del siguiente piso.</figcaption></figure>
+</div>
+
+<h3>Arquitectura desplegada en AWS</h3>
+<svg viewBox="0 0 760 300" width="100%" role="img" aria-label="Arquitectura de La Torre en AWS">
+  <defs><marker id="f" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker></defs>
+  <rect x="5" y="5" width="750" height="290" rx="6" fill="#faf8f3" stroke="#d9d4c7"/>
+  <text x="15" y="24" font-size="12" font-weight="600" fill="#2a2108">AWS us-east-2 · creado y destruido con Terraform (estado remoto en S3)</text>
+  <!-- GitHub -->
+  <rect x="15" y="40" width="130" height="62" rx="4" fill="#fff" stroke="#8a6a1f"/>
+  <text x="80" y="60" font-size="11" text-anchor="middle" font-weight="600">GitHub Actions</text>
+  <text x="80" y="76" font-size="9.5" text-anchor="middle">pruebas · terraform validate</text>
+  <text x="80" y="90" font-size="9.5" text-anchor="middle">imagen etiquetada por SHA</text>
+  <rect x="15" y="125" width="130" height="44" rx="4" fill="#fff" stroke="#8a6a1f"/>
+  <text x="80" y="143" font-size="11" text-anchor="middle" font-weight="600">ECR</text>
+  <text x="80" y="158" font-size="9.5" text-anchor="middle">torre-server:&lt;sha&gt;</text>
+  <line x1="80" y1="102" x2="80" y2="123" stroke="#555" marker-end="url(#f)"/>
+  <!-- EKS -->
+  <rect x="170" y="38" width="380" height="245" rx="5" fill="#fff" stroke="#2a2108"/>
+  <text x="180" y="56" font-size="11.5" font-weight="600">EKS 1.35 · nodos c7i-flex.large (2–8, Cluster Autoscaler)</text>
+  <rect x="182" y="66" width="200" height="98" rx="4" fill="#efe9da" stroke="#8a6a1f"/>
+  <text x="282" y="84" font-size="10.5" text-anchor="middle" font-weight="600">Agones 1.62</text>
+  <text x="282" y="100" font-size="9.5" text-anchor="middle">Fleet torre-fleet / jefedia-fleet</text>
+  <text x="282" y="114" font-size="9.5" text-anchor="middle">FleetAutoscaler Buffer 20 %</text>
+  <text x="282" y="128" font-size="9.5" text-anchor="middle">GameServer = 1 run (≤ 3 jugadores</text>
+  <text x="282" y="141" font-size="9.5" text-anchor="middle">+ espectadores), puerto 7000–8000</text>
+  <text x="282" y="155" font-size="9.5" text-anchor="middle">métricas Prometheus :9100</text>
+  <rect x="392" y="66" width="148" height="98" rx="4" fill="#efe9da" stroke="#8a6a1f"/>
+  <text x="466" y="84" font-size="10.5" text-anchor="middle" font-weight="600">Observabilidad</text>
+  <text x="466" y="100" font-size="9.5" text-anchor="middle">Prometheus (PodMonitor,</text>
+  <text x="466" y="114" font-size="9.5" text-anchor="middle">ServiceMonitor de Agones)</text>
+  <text x="466" y="128" font-size="9.5" text-anchor="middle">Grafana: CCU, tick p99,</text>
+  <text x="466" y="141" font-size="9.5" text-anchor="middle">servidores, nodos, egress</text>
+  <rect x="182" y="176" width="200" height="44" rx="4" fill="#fff" stroke="#999" stroke-dasharray="4 3"/>
+  <text x="282" y="194" font-size="10.5" text-anchor="middle" font-weight="600">Locust (pod, prueba 3.4)</text>
+  <text x="282" y="209" font-size="9.5" text-anchor="middle">asigna con GameServerAllocation</text>
+  <rect x="392" y="176" width="148" height="44" rx="4" fill="#fff" stroke="#999"/>
+  <text x="466" y="194" font-size="10.5" text-anchor="middle" font-weight="600">Cluster Autoscaler</text>
+  <text x="466" y="209" font-size="9.5" text-anchor="middle">agrega nodos si hay pods pendientes</text>
+  <text x="360" y="246" font-size="9.5" text-anchor="middle" fill="#555">VPC 10.40.0.0/16 · 2 subredes públicas en 2 zonas · sin NAT (ahorro)</text>
+  <text x="360" y="262" font-size="9.5" text-anchor="middle" fill="#555">Seguridad: puertos 7000–8000 abiertos al juego; 8081 solo desde el plano de control</text>
+  <line x1="145" y1="147" x2="180" y2="120" stroke="#555" marker-end="url(#f)"/>
+  <!-- Serverless -->
+  <rect x="575" y="40" width="170" height="92" rx="4" fill="#fff" stroke="#8a6a1f"/>
+  <text x="660" y="58" font-size="11" text-anchor="middle" font-weight="600">Tabla de líderes</text>
+  <text x="660" y="74" font-size="9.5" text-anchor="middle">Lambda python3.12 + URL</text>
+  <text x="660" y="88" font-size="9.5" text-anchor="middle">DynamoDB bajo demanda</text>
+  <text x="660" y="102" font-size="9.5" text-anchor="middle">POST /resultado (servidor)</text>
+  <text x="660" y="116" font-size="9.5" text-anchor="middle">GET top (clientes)</text>
+  <line x1="384" y1="110" x2="573" y2="96" stroke="#555" marker-end="url(#f)"/>
+  <rect x="575" y="148" width="170" height="58" rx="4" fill="#fff" stroke="#8a6a1f"/>
+  <text x="660" y="166" font-size="11" text-anchor="middle" font-weight="600">Costos y estado</text>
+  <text x="660" y="182" font-size="9.5" text-anchor="middle">AWS Budgets USD 10</text>
+  <text x="660" y="196" font-size="9.5" text-anchor="middle">S3 terraform.tfstate (lockfile)</text>
+  <rect x="575" y="222" width="170" height="58" rx="4" fill="#fff" stroke="#2a2108"/>
+  <text x="660" y="240" font-size="11" text-anchor="middle" font-weight="600">Jugadores</text>
+  <text x="660" y="256" font-size="9.5" text-anchor="middle">cliente Three.js por WebSocket</text>
+  <text x="660" y="270" font-size="9.5" text-anchor="middle">a IP pública del nodo:puerto</text>
+  <line x1="575" y1="250" x2="384" y2="150" stroke="#555" marker-end="url(#f)"/>
+</svg>
+
+<!-- ================= 3.1 ================= -->
+<h2 class="salto" style="margin-top:0">2. Práctica 3.1 — Cómputo para IA: entrenar y servir el bot</h2>
+<p>En lugar de CartPole, el entorno de Gymnasium (<code>ia/entorno_duelo.py</code>) es <b>un caballero contra el Guardián de Hierro</b>,
+usando la lógica real del servidor: 14 observaciones, 7 acciones y decisiones a 10 Hz. El entorno corre a <b>21 779 pasos/s</b>.
+El agente es PPO de Stable-Baselines3 (red 64-64). Equipo: Ryzen 5 7533HS (6 núcleos), sin GPU NVIDIA.</p>
+<div class="dos">
+<div>
+<h3>Entrenamiento (medido)</h3>
+<table>
+  <tr><th>Configuración</th><th class="n">Pasos</th><th class="n">Tiempo</th><th class="n">Pasos/s</th></tr>
+  <tr><td>1 entorno (PDF)</td><td class="n">100 000</td><td class="n">158.8 s</td><td class="n">630</td></tr>
+  <tr><td>1 entorno, repetición</td><td class="n">100 000</td><td class="n">160.4 s</td><td class="n">623</td></tr>
+  <tr><td>8 entornos</td><td class="n">1 000 000</td><td class="n">928.6 s</td><td class="n">1 077</td></tr>
+  <tr><td>GPU T4 (Colab)</td><td colspan="3"><i>no medido</i></td></tr>
+</table>
+<h3>Calidad (50 combates, semillas fijas)</h3>
+<table>
+  <tr><th>Jugador</th><th class="n">Victorias</th></tr>
+  <tr><td>Azar</td><td class="n">0 %</td></tr>
+  <tr><td>PPO 100 000 pasos</td><td class="n">20 %</td></tr>
+  <tr><td><b>PPO 1 000 000 pasos</b></td><td class="n"><b>100 %</b> (30.9 s)</td></tr>
+  <tr><td>Bot de reglas, reflejos perfectos</td><td class="n">100 % (53.4 s)</td></tr>
+</table>
+</div>
+<div>
+<h3>Inferencia: 2 000 bots a 10 Hz (20 000 decisiones/s)</h3>
+<table>
+  <tr><th>Forma de servir</th><th class="n">Latencia</th><th class="n">vCPU (+30 %)</th></tr>
+  <tr><td>PyTorch (SB3)</td><td class="n">0.429 ms</td><td class="n">12</td></tr>
+  <tr><td><b>Red exportada a numpy</b></td><td class="n"><b>0.0155 ms</b></td><td class="n"><b>1</b></td></tr>
+</table>
+<p>Las 1 000 decisiones de prueba salieron idénticas en las dos versiones, y numpy es ~28 veces más rápido: en una red tan
+pequeña pesa más el costo fijo de llamar a PyTorch que el cálculo. El servidor usa la versión numpy.</p>
+<h3>Costo en AWS (precios oficiales, us-east-2)</h3>
+<table>
+  <tr><th>Uso</th><th>Instancia</th><th class="n">USD/h</th><th class="n">Spot</th></tr>
+  <tr><td>Inferencia PyTorch</td><td>c7i.4xlarge</td><td class="n">0.714</td><td class="n">0.18–0.23</td></tr>
+  <tr><td>Inferencia numpy</td><td>c7i.large</td><td class="n">0.089</td><td class="n">0.020–0.029</td></tr>
+  <tr><td>Entrenamiento GPU</td><td>g4dn.xlarge (T4)</td><td class="n">0.526</td><td class="n">0.27–0.28</td></tr>
+</table>
+<p>Servir 2 000 bots cuesta <b>USD 521/mes con PyTorch contra 65 con numpy</b>. En la práctica, con numpy caben en los nodos de
+juego que ya existen. El entrenamiento va en <b>Spot</b>, porque si AWS reclama la máquina se reanuda desde el último
+checkpoint. La inferencia va <b>bajo demanda</b>, junto a las partidas, porque no puede cortarse.</p>
+</div>
+</div>
+<div class="dos">
+  <figure><img src="../capturas/3.1-01-entrenamiento.png" alt="Entrenamiento"><figcaption>3.1-01 · Entrenamiento de 100 000 pasos en CPU: 160.4 s.</figcaption></figure>
+  <figure><img src="../capturas/3.1-02-medir.png" alt="Medición"><figcaption>3.1-02 · <code>medir.py</code>: victorias, latencia de inferencia y vCPU necesarias.</figcaption></figure>
+</div>
+
+<!-- ================= 3.3 ================= -->
+<h2 class="salto">3. Práctica 3.3 — Contenedores y orquestación con Agones</h2>
+<ul>
+  <li><b>Contenedor:</b> <code>server/Dockerfile</code> con Python 3.11 slim, usuario sin privilegios y puertos 7654 (juego) y 9100 (métricas).
+    La imagen pesa 46.1 MB en ECR. En el contenedor Linux, el tick medio fue de <b>0.50 ms</b> (2 901 ticks), el 1 % del presupuesto de 50 ms.</li>
+  <li><b>SDK de Agones:</b> el servidor avisa <i>Ready</i> al arrancar, manda <i>Health</i> en segundo plano, se marca <i>Allocated</i> cuando
+    entra el primer jugador y pide <i>Shutdown</i> al terminar la run. Así cada GameServer vive exactamente una partida.</li>
+  <li><b>Flotas:</b> <code>k8s/fleet-torre.yaml</code> (3 réplicas, 250m de CPU y 128 MiB por servidor) y <code>fleet-jefedia.yaml</code>.
+    Los FleetAutoscaler tienen un buffer del 20 %.</li>
+</ul>
+<div class="tres">
+  <figure><img src="../capturas/3.3-01-docker-run.png" alt="docker run"><figcaption>3.3-01 · El servidor en un contenedor local (Agones: no).</figcaption></figure>
+  <figure><img src="../capturas/3.3-02b-metrics-final.png" alt="métricas"><figcaption>3.3-02 · Métricas <code>torre_*</code> expuestas para Prometheus.</figcaption></figure>
+  <figure><img src="../capturas/3.3-03-eks-nodos.png" alt="nodos"><figcaption>3.3-03 · Nodos de EKS 1.35 listos.</figcaption></figure>
+  <figure><img src="../capturas/3.3-04-gameservers-antes.png" alt="gameservers"><figcaption>3.3-04 · 5 GameServers en Ready (3 de torre-fleet y 2 de jefedia-fleet).</figcaption></figure>
+  <figure><img src="../capturas/3.3-05b-gameservers-despues.png" alt="asignación"><figcaption>3.3-05 · Tras <code>GameServerAllocation</code>, uno pasa a <b>Allocated</b>. Con 3 réplicas, el 20 % pide 1 libre y quedan 2: la flota no crece.</figcaption></figure>
+  <figure><img src="../capturas/3.3-06b-flota-repuesta.png" alt="repuesto"><figcaption>3.3-06 · Al borrar el pod asignado, Agones lo marca <i>Unhealthy</i> y crea otro servidor Ready en ~30 s. La partida perdida no se "revive".</figcaption></figure>
+  <figure><img src="../capturas/3.3-07-ecr.png" alt="ECR"><figcaption>3.3-07 · Imagen en ECR con las etiquetas <code>1.5</code> y <code>67dd006</code> (SHA del commit).</figcaption></figure>
+</div>
+
+<!-- ================= 3.2 ================= -->
+<h2 class="salto">4. Práctica 3.2 — CI/CD: del repositorio a la flota</h2>
+<p><b>Pipeline</b> (<code>.github/workflows/ci.yml</code>), en cada push y pull request: 122 pruebas del servidor, 9 de la Lambda, validación de
+los YAML de Kubernetes y <code>terraform fmt</code>/<code>validate</code>. Después construye la imagen con la etiqueta = <b>SHA del commit</b>, que nunca se sobrescribe.</p>
+<div class="nota"><b>Limitación de la cuenta:</b> la cuenta de AWS del plan gratuito pertenece a una organización cuya política (SCP) <b>prohíbe
+<code>iam:CreateOpenIDConnectProvider</code></b>. Por eso no se pudo crear el rol OIDC para que GitHub publique en ECR sin llaves. No usé
+llaves de larga duración en GitHub, que es justo lo que el material recomienda evitar. La publicación en ECR y la actualización de la flota se
+hicieron con los mismos pasos del pipeline desde la terminal. El código queda listo con <code>-var=crear_oidc_github=true</code> para una
+cuenta sin esa restricción.</div>
+<h3>Despliegue sin cortar partidas (medido 20:56 UTC)</h3>
+<p>Primero asigné un servidor para simular una partida en curso. Luego apliqué la flota con la imagen <code>:4f65218</code>. 50 s después:</p>
+<table>
+  <tr><th>GameServer</th><th>Estado</th><th>Imagen</th></tr>
+  <tr><td>torre-fleet-9kb9l-qrpwr</td><td><b>Allocated</b></td><td>torre-server:67dd006 (anterior: la partida sigue)</td></tr>
+  <tr><td>torre-fleet-l4nlg-7ph6v / -bbfkn</td><td>Ready</td><td>torre-server:<b>4f65218</b> (nueva)</td></tr>
+</table>
+<p><b>Rollback:</b> como cada imagen lleva su SHA y ECR guarda las anteriores, volver atrás es aplicar la flota con la etiqueta buena
+(<code>:67dd006</code>). Agones reemplaza solo los servidores libres y las partidas en curso terminan con su versión. No hay que reconstruir nada.</p>
+<div class="dos">
+  <figure><img src="../capturas/3.2-01-pipeline-verde.png" alt="pipeline"><figcaption>3.2-01 · Pipeline en verde con los dos trabajos.</figcaption></figure>
+  <figure><img src="../capturas/3.2-03-flota-actualizada.png" alt="flota actualizada"><figcaption>3.2-03 · Actualización gradual: la partida asignada conserva su imagen.</figcaption></figure>
+</div>
+
+<!-- ================= 3.4 ================= -->
+<h2 class="salto">5. Práctica 3.4 — Autoescalado y pruebas de carga</h2>
+<p><b>Montaje:</b> kube-prometheus-stack con Grafana (tablero <code>grafana/tablero-torre.json</code>), PodMonitor del juego cada 5 s y
+ServiceMonitor de Agones. Locust corrió <b>como pod dentro del clúster</b>, en la misma región, con 1.5 vCPU reservadas. Pedía servidores a
+la API de Kubernetes con una cuenta de servicio que solo puede crear <code>GameServerAllocation</code>. Cada jugador simulado juega runs
+completas con la estrategia de los bots y mide el RTT con un ping por segundo.</p>
+<div class="kpis">
+  <div class="kpi"><b>120</b><span>jugadores simulados (rampa de 18 min, grupos de 3)</span></div>
+  <div class="kpi"><b>6 ms</b><span>RTT p99 (73 537 pings, 0 fallos)</span></div>
+  <div class="kpi"><b>2.2 ms</b><span>tick p99 máximo (meta &lt; 25 ms)</span></div>
+  <div class="kpi"><b>208 s</b><span>reacción: pod pendiente → nodo nuevo listo</span></div>
+</div>
+<table>
+  <tr><th>Capa de autoescalado</th><th>Qué pasó (medido)</th></tr>
+  <tr><td>Agones FleetAutoscaler</td><td>GameServers de 5 a <b>54</b>. Los Allocated siguen a los jugadores (≈ 1 por grupo de 3).</td></tr>
+  <tr><td>Cluster Autoscaler</td><td>Nodos de 4 a <b>8</b> (tope): +1 a los 288 s, 366 s, 458 s y 540 s.</td></tr>
+  <tr><td>Límite</td><td>Con 8 nodos se llegó a <b>35 Allocated (~105 jugadores)</b>; después hubo hasta 10 pods pendientes y asignaciones sin
+  servidor libre. Lo que se agotó fue la <b>CPU reservada</b> (250m por servidor), no el servidor del juego.</td></tr>
+</table>
+<div class="dos">
+<div>
+<table>
+  <tr><th>Recurso (últimos 5 min de la rampa)</th><th class="n">Medido</th></tr>
+  <tr><td>CPU por GameServer</td><td class="n"><b>17.7 m</b> (reservados 250 m)</td></tr>
+  <tr><td>Egress por jugador</td><td class="n"><b>119 kbps</b></td></tr>
+  <tr><td>Egress por espectador</td><td class="n"><b>57 kbps</b></td></tr>
+  <tr><td>Snapshots a 30 espectadores</td><td class="n">51 039, <b>0 tardíos</b>, cada 100 ms</td></tr>
+  <tr><td>Runs completas en la rampa</td><td class="n">172 (65 victorias)</td></tr>
+</table>
+<p style="font-size:9pt">Como el RTT nunca se acercó a la meta de 80 ms, la capacidad no la marcó la latencia sino la reserva de CPU: con
+250m por servidor caben ~7 servidores por nodo c7i-flex.large (~21 jugadores). Medido: ~105 jugadores en 8 nodos que también
+corrían Agones, Prometheus y Locust.</p>
+</div>
+<figure><img src="../../loadtest/resultados/escalado.png" alt="escalado"><figcaption>Línea de tiempo del autoescalado (<code>registrar_escalado.py</code>, cada ~11 s).</figcaption></figure>
+</div>
+<figure><img src="../capturas/3.4-01-grafana.png" alt="Grafana"><figcaption>3.4-01 · Tablero en Grafana durante la rampa: 112 jugadores, servidores Allocated subiendo, nodos 4→8, tick p99 ~2 ms y egress de ~13 Mbps.</figcaption></figure>
+<div class="dos">
+  <figure><img src="../capturas/3.4-03-nodos-escalando.png" alt="nodos"><figcaption>3.4-03 · 4 nodos nuevos de 4–9 minutos de edad, creados por el Cluster Autoscaler.</figcaption></figure>
+  <figure><img src="../capturas/3.4-02-locust.png" alt="Locust"><figcaption>3.4-02 · Resumen de Locust de la rampa.</figcaption></figure>
+</div>
+<div class="nota"><b>Lo que no salió perfecto:</b> 302 veces un jugador simulado pasó más de 5 s sin recibir estado, casi siempre al cerrarse
+la run; la causa no se confirmó. El primer intento de pico con espectadores no sirvió (los espectadores quedaron en otro proceso de Locust)
+y lo repetí con 60 usuarios. Con <code>--processes</code>, Locust no guarda el historial del RTT por separado; la curva CCU-p95 automática
+mezcla el RTT con las asignaciones (300–500 ms). Por eso reporto el RTT con el resumen final. La escala (120 jugadores y 30 espectadores)
+la limitó el tope de 8 nodos que fijé para cuidar el presupuesto.</div>
+
+<!-- ================= 3.5 ================= -->
+<h2 class="salto">6. Práctica 3.5 — Serverless: tabla de líderes</h2>
+<p>Lambda python3.12 (256 MB) con Function URL pública y DynamoDB bajo demanda, todo creado con Terraform. El servidor del juego
+manda <code>POST /resultado</code> al terminar cada run y los clientes consultan el top por sala (solo, bots, grupo).
+<b>Hallazgo:</b> la URL respondía <b>403</b> porque una Function URL pública necesita dos permisos
+(<code>lambda:InvokeFunctionUrl</code> e <code>InvokeFunction</code>). La consola los agrega sola, pero Terraform no.</p>
+<h3>Prueba de carga 80/20 con 500 usuarios (5 min, 19:44–19:49 UTC)</h3>
+<table>
+  <tr><th></th><th class="n">Peticiones</th><th class="n">Rechazadas (429)</th><th class="n">p50</th><th class="n">p95</th><th class="n">p99</th></tr>
+  <tr><td>GET top (80 %)</td><td class="n">106 666</td><td class="n">80.2 %</td><td class="n">71 ms</td><td class="n">150 ms</td><td class="n">360 ms</td></tr>
+  <tr><td>POST resultado (20 %)</td><td class="n">26 703</td><td class="n">80.3 %</td><td class="n">71 ms</td><td class="n">130 ms</td><td class="n">350 ms</td></tr>
+</table>
+<ul>
+  <li><b>Instancias concurrentes: 10 todo el tiempo.</b> Es el límite de concurrencia de las cuentas nuevas (lo normal es 1 000).
+    Lambda atendió ~85 peticiones/s y rechazó el resto con 429. Conclusión: "serverless escala solo" tiene un tope de cuenta, y hay que pedir el aumento antes de un lanzamiento.</li>
+  <li><b>Arranque en frío:</b> 10 en toda la prueba (uno por instancia), de ~93 ms. No explica la cola de 2–5 s, que viene de la saturación.</li>
+  <li>Las escrituras usaron 200 jugadores fijos. Si cada escritura creara un jugador nuevo, cada consulta del top recorrería una tabla cada vez más grande
+    (≈ USD 2 contra ≈ USD 0.35 estimados para esta prueba).</li>
+</ul>
+<table>
+  <tr><th>Costo mensual con 1 millón de peticiones (precios oficiales)</th><th class="n">USD/mes</th></tr>
+  <tr><td>Lambda + DynamoDB (serverless)</td><td class="n"><b>≈ 1.33</b></td></tr>
+  <tr><td>VM t3.micro encendida todo el mes (+ IPv4 + 8 GB)</td><td class="n">≈ 11.88</td></tr>
+  <tr><td>VM t3.small encendida todo el mes</td><td class="n">≈ 19.47</td></tr>
+</table>
+<p>Serverless sale más barato hasta unos 9 millones de peticiones al mes, y sin jugadores cuesta casi cero. El servidor de partida, en cambio,
+no puede ser serverless: guarda la partida en memoria y mantiene conexiones largas.</p>
+<div class="dos">
+  <figure><img src="../capturas/3.5-02-concurrencia.png" alt="Concurrencia"><figcaption>3.5-02 · CloudWatch: ConcurrentExecutions plano en 10 y 22 022 rechazos (Throttles) por minuto.</figcaption></figure>
+  <figure><img src="../capturas/3.5-03-locust.png" alt="Locust 80/20"><figcaption>3.5-03 · Resumen de Locust de la prueba 80/20.</figcaption></figure>
+  <figure><img src="../capturas/3.5-01a-url-post.png" alt="POST"><figcaption>3.5-01 · POST a la Function URL.</figcaption></figure>
+  <figure><img src="../capturas/3.5-01b-url-get.png" alt="GET"><figcaption>3.5-01 · GET del top: el resultado registrado aparece primero.</figcaption></figure>
+</div>
+
+<!-- ================= 3.6 ================= -->
+<h2 class="salto">7. Práctica 3.6 — Infraestructura como código con Terraform</h2>
+<p><code>infra/</code> describe todo: VPC sin NAT, EKS 1.35 con su grupo de nodos, Agones y Cluster Autoscaler (Helm desde Terraform), ECR, Lambda,
+URL, DynamoDB, roles, alerta de presupuesto de USD 10 y la regla del webhook. El estado vive en <b>S3 con bloqueo</b>
+(<code>use_lockfile</code>) y los cambios se revisaron en un pull request con el plan y su costo antes del <code>apply</code>.</p>
+<table>
+  <tr><th>Problema encontrado al aplicar</th><th>Arreglo en el código</th></tr>
+  <tr><td>EKS 1.32 por defecto habría entrado a soporte extendido (+USD 0.50/h)</td><td>EKS 1.35 (Agones 1.62 soporta 1.34–1.36)</td></tr>
+  <tr><td>El plan gratuito rechazó c7i.large ("not eligible for Free Tier")</td><td>Nodos c7i-flex.large (USD 0.08479/h)</td></tr>
+  <tr><td>La SCP prohíbe crear proveedores OIDC (IRSA y GitHub)</td><td>Política del autoescalador en el rol de los nodos, limitada al clúster; OIDC de GitHub opcional</td></tr>
+  <tr><td>El chart de Agones creaba 2 Classic ELB que cobran y que el destroy no borraría</td><td>Allocator en ClusterIP y ping desactivado</td></tr>
+  <tr><td>Crear la Fleet fallaba: el plano de control no llegaba al webhook de Agones</td><td>Regla de seguridad TCP 8081 solo desde el plano de control</td></tr>
+  <tr><td>La alerta del presupuesto descontaba los créditos (nunca avisaría)</td><td><code>include_credit = false</code></td></tr>
+  <tr><td>El destroy se trabó: los finalizers de Agones agotaron el tiempo</td><td>Desinstalar Agones antes del destroy (documentado en <code>infra/README.md</code>)</td></tr>
+</table>
+<p>Después de los arreglos, <code>terraform plan</code> respondió <b>"No changes"</b> (sin drift). El <code>destroy</code> terminó con
+<b>"Destroy complete! Resources: 38 destroyed"</b> (la primera corrida ya había borrado el resto). <code>scripts/comprobar-huerfanos.ps1</code> confirmó que
+no quedó nada. Solo se conserva el bucket S3 del estado.</p>
+<div class="tres">
+  <figure><img src="../capturas/3.6-01b-pr-costos.png" alt="PR costos"><figcaption>3.6-01 · Pull request con el plan y el costo por hora.</figcaption></figure>
+  <figure><img src="../capturas/3.6-02-apply.png" alt="plan sin cambios"><figcaption>3.6-02 · Plan sin cambios y salidas de Terraform.</figcaption></figure>
+  <figure><img src="../capturas/3.6-04-destroy.png" alt="destroy"><figcaption>3.6-04 · Destroy completo.</figcaption></figure>
+  <figure><img src="../capturas/3.6-05-sin-huerfanos.png" alt="sin huérfanos"><figcaption>3.6-05 · Sin recursos huérfanos.</figcaption></figure>
+  <figure><img src="../capturas/3.6-03-cluster.png" alt="cluster"><figcaption>3.6-03 · Clúster activo en la consola, en soporte estándar hasta marzo de 2027.</figcaption></figure>
+  <figure><img src="../capturas/3.0-presupuesto.png" alt="presupuesto"><figcaption>Alerta de presupuesto de USD 10 (creada antes de la primera práctica).</figcaption></figure>
+</div>
+
+<!-- ================= CONCLUSIONES ================= -->
+<h2 class="salto">8. Capacidad, costos y recomendaciones</h2>
+<h3>Costo por hora y por jugador (precios oficiales de us-east-2)</h3>
+<table>
+  <tr><th>Escenario</th><th class="n">Cómputo USD/h</th><th class="n">Egress USD/h</th><th class="n">USD por jugador-hora</th></tr>
+  <tr><td>Medido: 120 jugadores en 8 nodos + EKS + IPv4</td><td class="n">0.82</td><td class="n">0.58</td><td class="n">≈ 0.0117</td></tr>
+  <tr><td>Proyección 20 000 jugadores, reserva actual (≈ 953 nodos)</td><td class="n">≈ 86</td><td class="n">54–96</td><td class="n">≈ 0.007–0.009</td></tr>
+  <tr><td>Proyección 20 000 jugadores, reserva ajustada a 50 m (≈ 267 nodos)</td><td class="n">≈ 24</td><td class="n">54–96</td><td class="n">≈ 0.004–0.006</td></tr>
+</table>
+<p style="font-size:9pt">Egress = jugadores × 119 kbps (1 071 GB/h para 20 000) × USD 0.05–0.09/GB según el tramo; para los 120 jugadores medidos, 0.0536 GB/h por jugador × 0.09.
+La proyección supone que el consumo por servidor y por jugador crece en línea recta. Gasto estimado del día (≈ 2.7 h de clúster con 2–8 nodos,
+Lambda y DynamoDB): <b>≈ USD 1.5–2.5</b>, cubierto por los créditos. El dato real se revisa en Cost Explorer en 24 h.</p>
+<h3>Recomendaciones (con base en lo medido)</h3>
+<ul>
+  <li><b>Ajustar la reserva de CPU de los GameServers</b> de 250 m a ~50 m. El consumo real es de 18 m, así que la reserva actual desperdicia ~14 veces
+    la capacidad y es lo que detuvo la prueba en 105 jugadores. Así se pasa de ~7 a ~25 servidores por nodo (tope de pods del CNI).</li>
+  <li><b>El egress se vuelve el costo dominante</b> una vez ajustado el cómputo: enviar deltas en lugar del estado completo, comprimir los snapshots
+    y, para espectadores masivos, retransmitir por CDN.</li>
+  <li><b>Colchón ante picos:</b> un nodo tarda ~3.5 min en llegar. Para lanzamientos o eventos conviene subir el buffer del FleetAutoscaler o dejar
+    nodos de reserva; el 20 % se agotó durante la rampa.</li>
+  <li><b>Pedir los aumentos de cuota antes del lanzamiento:</b> la concurrencia de Lambda (10 → 1 000) y las vCPU de EC2.</li>
+  <li><b>La IA cabe en el presupuesto:</b> exportada a numpy, servir 2 000 bots cuesta 1 vCPU. El entrenamiento va en Spot.</li>
+</ul>
+<h3>Pendiente para la entrega del proyecto integrador (19 de noviembre)</h3>
+<ul>
+  <li>El proyecto integrador pide la prueba de 1 000 jugadores y 500 espectadores. Hoy se llegó a 120 y 30 por el tope de 8 nodos. Con la reserva
+    ajustada y un tope mayor (dentro de la cuota de 32 vCPU), la misma infraestructura puede repetir la prueba a mayor escala.</li>
+  <li>Medir el entrenamiento en GPU (Colab T4) y confirmar el costo real del día en Cost Explorer.</li>
+  <li>Investigar los 302 casos sin estado por más de 5 s al cerrar la run.</li>
+</ul>
+</body>
+</html>
