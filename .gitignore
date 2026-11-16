@@ -43,3 +43,5 @@ logs/
 # Terraform: el lock de proveedores SÍ se versiona; el estado y la config del backend no
 infra/.terraform/
 infra/backend.hcl
+infra/.aws-config-terraform
+infra/plan_local_override.tf

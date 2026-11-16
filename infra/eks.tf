@@ -8,6 +8,11 @@ module "eks" {
   cluster_endpoint_public_access           = true
   enable_cluster_creator_admin_permissions = true # quien hace "apply" administra el clúster
 
+  # Sin llave KMS propia: al destruir, AWS deja las llaves "pendientes de borrado" 7–30 días
+  # y quedarían como recurso huérfano. Para la práctica basta el cifrado por defecto de EKS.
+  create_kms_key            = false
+  cluster_encryption_config = {}
+
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.public_subnets
 

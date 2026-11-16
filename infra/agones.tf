@@ -15,6 +15,7 @@ resource "helm_release" "agones" {
   name             = "agones"
   repository       = "https://agones.dev/chart/stable"
   chart            = "agones"
+  version          = "1.62.0" # soporta Kubernetes 1.34–1.36
   namespace        = "agones-system"
   create_namespace = true
   depends_on       = [module.eks]

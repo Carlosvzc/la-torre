@@ -11,9 +11,11 @@ variable "proyecto" {
 }
 
 variable "version_kubernetes" {
+  # Agones 1.62 soporta 1.34–1.36 y EKS tiene 1.34–1.37 en soporte estándar (16/11/2026).
+  # Una versión en soporte EXTENDIDO cobra mucho más por hora de clúster.
   description = "Versión de EKS (debe estar soportada por Agones; ver infra/README.md)"
   type        = string
-  default     = "1.32"
+  default     = "1.35"
 }
 
 variable "tipo_nodo" {
