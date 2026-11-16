@@ -1,0 +1,73 @@
+# Pipeline CI/CD de La Torre (práctica 3.2, variante AWS del PDF).
+# 1. Pruebas (servidor y Lambda) + validación de Terraform y de los YAML de Kubernetes.
+# 2. Construye la imagen del servidor con la etiqueta del commit.
+# 3. Si existe el rol de AWS (variable AWS_ROLE_ARN), la publica en ECR con OIDC (sin llaves).
+# Si las pruebas fallan, nada se construye ni se publica: esa es la protección de CI.
+name: torre-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REPO: torre-server
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Dependencias
+        run: pip install -r server/requirements.txt pytest pyyaml
+      - name: Pruebas del servidor del juego
+        run: pytest -q server
+      - name: Pruebas de la tabla de líderes (Lambda)
+        run: pytest -q serverless/leaderboard
+      - name: YAML de Kubernetes bien formados
+        run: python -c "import glob,yaml; [list(yaml.safe_load_all(open(f))) for f in glob.glob('k8s/*.yaml')]; print('k8s OK')"
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+      - name: Terraform fmt y validate
+        working-directory: infra
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+
+  imagen:
+    needs: pruebas
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # OIDC con AWS
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir la imagen (etiqueta = SHA del commit)
+        run: docker build -t "$ECR_REPO:${{ github.sha }}" server
+      - name: Credenciales temporales de AWS (OIDC)
+        if: vars.AWS_ROLE_ARN != '' && github.event_name != 'pull_request'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Entrar a ECR
+        if: vars.AWS_ROLE_ARN != '' && github.event_name != 'pull_request'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Publicar en ECR
+        if: vars.AWS_ROLE_ARN != '' && github.event_name != 'pull_request'
+        run: |
+          DESTINO="${{ steps.ecr.outputs.registry }}/$ECR_REPO"
+          docker tag "$ECR_REPO:${{ github.sha }}" "$DESTINO:${{ github.sha }}"
+          docker push "$DESTINO:${{ github.sha }}"
+          echo "Publicada: $DESTINO:${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Sin AWS todavía
+        if: vars.AWS_ROLE_ARN == ''
+        run: echo "Imagen construida; falta la variable AWS_ROLE_ARN para publicarla en ECR." >> "$GITHUB_STEP_SUMMARY"

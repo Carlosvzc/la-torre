@@ -39,3 +39,7 @@ loadtest/resultados/local*
 
 # Registros del lanzador del juego
 logs/
+
+# Terraform: el lock de proveedores SÍ se versiona; el estado y la config del backend no
+infra/.terraform/
+infra/backend.hcl

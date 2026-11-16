@@ -1,0 +1,62 @@
+variable "region" {
+  description = "Región de AWS"
+  type        = string
+  default     = "us-east-2"
+}
+
+variable "proyecto" {
+  description = "Prefijo de los nombres de los recursos"
+  type        = string
+  default     = "la-torre"
+}
+
+variable "version_kubernetes" {
+  description = "Versión de EKS (debe estar soportada por Agones; ver infra/README.md)"
+  type        = string
+  default     = "1.32"
+}
+
+variable "tipo_nodo" {
+  description = "Tipo de instancia de los nodos de juego (optimizada a cómputo)"
+  type        = string
+  default     = "c7i.large"
+}
+
+variable "nodos_min" {
+  type    = number
+  default = 2
+}
+
+variable "nodos_deseados" {
+  type    = number
+  default = 2
+}
+
+variable "nodos_max" {
+  description = "Tope del Cluster Autoscaler (la prueba de carga 3.4 lo usa)"
+  type        = number
+  default     = 8
+}
+
+variable "repo_github" {
+  description = "Repositorio que puede publicar imágenes en ECR (OIDC, sin llaves)"
+  type        = string
+  default     = "Carlosvzc/la-torre"
+}
+
+variable "crear_oidc_github" {
+  description = "false si la cuenta ya tiene el proveedor OIDC de GitHub"
+  type        = bool
+  default     = true
+}
+
+variable "correo_alerta" {
+  description = "Correo para la alerta de presupuesto (vacío = sin alerta por Terraform)"
+  type        = string
+  default     = ""
+}
+
+variable "presupuesto_usd" {
+  type    = number
+  default = 10
+}
