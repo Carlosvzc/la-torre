@@ -1,0 +1,28 @@
+# Autoescalado de las flotas (práctica 3.4): siempre un 20 % de servidores Ready esperando
+# runs nuevas. Agones calcula el % sobre el total: con 40 Allocated mantiene ⌈40/0.8⌉ = 50.
+# Si los pods no caben en los nodos, el Cluster Autoscaler de EKS agrega nodos (otra capa).
+apiVersion: autoscaling.agones.dev/v1
+kind: FleetAutoscaler
+metadata:
+  name: torre-autoscaler
+spec:
+  fleetName: torre-fleet
+  policy:
+    type: Buffer
+    buffer:
+      bufferSize: 20%
+      minReplicas: 3
+      maxReplicas: 200
+---
+apiVersion: autoscaling.agones.dev/v1
+kind: FleetAutoscaler
+metadata:
+  name: jefedia-autoscaler
+spec:
+  fleetName: jefedia-fleet
+  policy:
+    type: Buffer
+    buffer:
+      bufferSize: 20%
+      minReplicas: 2
+      maxReplicas: 100

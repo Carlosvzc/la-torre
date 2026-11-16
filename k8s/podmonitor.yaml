@@ -1,0 +1,15 @@
+# Prometheus lee el puerto "metrics" (9100) de cada GameServer cada 5 s (práctica 3.4).
+# Métricas del juego: torre_players_connected, torre_tick_seconds, torre_tick_lag_seconds,
+# torre_spectators_connected, torre_bytes_sent_total, torre_runs_total, torre_run_seconds.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: torre-gameservers
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      agones.dev/role: gameserver
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 5s

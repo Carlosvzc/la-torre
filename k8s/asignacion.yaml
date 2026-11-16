@@ -1,0 +1,8 @@
+# Pide un GameServer de la flota (lo que hace el emparejador al empezar una run).
+# Uso:  kubectl create -f k8s/asignacion.yaml   → uno pasa de Ready a Allocated
+apiVersion: allocation.agones.dev/v1
+kind: GameServerAllocation
+spec:
+  selectors:
+    - matchLabels:
+        agones.dev/fleet: torre-fleet

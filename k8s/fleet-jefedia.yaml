@@ -1,0 +1,44 @@
+# Flota del Jefe del día: un solo piso contra el Coloso del Eclipse, igual para todos.
+# Es la que recibe la prueba de PICO de la práctica 3.4 (1× → 10× jugadores en 20 s).
+apiVersion: agones.dev/v1
+kind: Fleet
+metadata:
+  name: jefedia-fleet
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        juego: la-torre
+        modo: jefe_dia
+    spec:
+      ports:
+        - name: juego
+          containerPort: 7654
+          protocol: TCP
+      health:
+        initialDelaySeconds: 10
+        periodSeconds: 5
+        failureThreshold: 3
+      template:
+        spec:
+          containers:
+            - name: torre
+              image: IMAGEN_SERVIDOR
+              env:
+                - name: MODO
+                  value: jefe_dia
+                - name: LEADERBOARD_URL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: torre-config
+                      key: leaderboard_url
+                      optional: true
+              ports:
+                - name: metrics
+                  containerPort: 9100
+              resources:
+                requests: { cpu: "250m", memory: "128Mi" }
+                limits:   { cpu: "500m", memory: "256Mi" }

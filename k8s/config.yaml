@@ -1,0 +1,9 @@
+# Configuración que leen los servidores. leaderboard_url la llena el despliegue con la
+# Function URL de la Lambda (salida de Terraform: lambda_url).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: torre-config
+  namespace: default
+data:
+  leaderboard_url: ""

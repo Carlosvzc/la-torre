@@ -1,0 +1,47 @@
+# Flota de servidores de La Torre (práctica 3.3). Cada GameServer es una run: solitario,
+# con bots o un grupo de hasta 3. IMAGEN_SERVIDOR se reemplaza al desplegar
+# (CI o scripts) por <cuenta>.dkr.ecr.us-east-2.amazonaws.com/torre-server:<sha>.
+apiVersion: agones.dev/v1
+kind: Fleet
+metadata:
+  name: torre-fleet
+spec:
+  replicas: 3
+  # Al actualizar la imagen, Agones reemplaza solo los servidores libres; los que tienen
+  # una run en curso (Allocated) terminan su partida antes de apagarse (drenado).
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        juego: la-torre
+        modo: torre
+    spec:
+      ports:
+        - name: juego
+          containerPort: 7654
+          protocol: TCP            # WebSocket viaja sobre TCP
+      health:
+        initialDelaySeconds: 10
+        periodSeconds: 5
+        failureThreshold: 3
+      template:
+        spec:
+          containers:
+            - name: torre
+              image: IMAGEN_SERVIDOR
+              env:
+                - name: MODO
+                  value: torre
+                - name: LEADERBOARD_URL       # Function URL de la Lambda (práctica 3.5)
+                  valueFrom:
+                    configMapKeyRef:
+                      name: torre-config
+                      key: leaderboard_url
+                      optional: true
+              ports:
+                - name: metrics              # lo lee Prometheus (práctica 3.4)
+                  containerPort: 9100
+              resources:
+                requests: { cpu: "250m", memory: "128Mi" }
+                limits:   { cpu: "500m", memory: "256Mi" }

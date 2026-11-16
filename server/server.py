@@ -316,12 +316,30 @@ class Servidor:
             await asyncio.gather(*self.tareas, return_exceptions=True)
 
 
+async def marcar_ready(intentos: int = 60, espera: float = 0.5) -> bool:
+    """Avisa a Agones que el servidor está listo.
+
+    Agones inyecta AGONES_SDK_HTTP_PORT en el contenedor: si está, estamos en Agones y se
+    reintenta /ready hasta que el sidecar responda (puede arrancar después que el juego).
+    Sin esa variable es modo local y basta un intento.
+    """
+    en_agones = "AGONES_SDK_HTTP_PORT" in os.environ
+    for _ in range(intentos if en_agones else 1):
+        if await asyncio.to_thread(agones, "/ready"):
+            return True
+        if en_agones:
+            await asyncio.sleep(espera)
+    if en_agones:
+        log.error("el SDK de Agones no respondió a /ready tras %d intentos", intentos)
+    return en_agones          # en Agones se mantienen los latidos aunque /ready tarde
+
+
 async def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     start_http_server(PUERTO_METRICAS)           # /metrics para Prometheus
     servidor = Servidor()
     async with websockets.serve(servidor.atender, "0.0.0.0", PUERTO, max_size=MAX_MENSAJE):
-        servidor.con_agones = await asyncio.to_thread(agones, "/ready")
+        servidor.con_agones = await marcar_ready()
         log.info("La Torre (modo %s) en :%d, métricas en :%d, Agones: %s",
                  MODO, PUERTO, PUERTO_METRICAS, "sí" if servidor.con_agones else "no (local)")
         await servidor.bucle()

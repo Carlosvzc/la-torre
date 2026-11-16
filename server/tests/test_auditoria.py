@@ -224,6 +224,24 @@ def test_las_tareas_en_segundo_plano_quedan_referenciadas():
     assert asyncio.run(caso()) == (1, 0)
 
 
+# --- Riesgo de la auditoría: /ready con el sidecar de Agones lento -------------------
+def test_ready_se_reintenta_si_el_sidecar_tarda(monkeypatch):
+    respuestas = iter([False, False, True])
+    llamadas = []
+    monkeypatch.setenv("AGONES_SDK_HTTP_PORT", "9358")
+    monkeypatch.setattr(server, "agones", lambda ruta: llamadas.append(ruta) or next(respuestas))
+    assert asyncio.run(server.marcar_ready(intentos=5, espera=0)) is True
+    assert llamadas == ["/ready"] * 3
+
+
+def test_ready_en_local_un_solo_intento(monkeypatch):
+    llamadas = []
+    monkeypatch.delenv("AGONES_SDK_HTTP_PORT", raising=False)
+    monkeypatch.setattr(server, "agones", lambda ruta: llamadas.append(ruta) or False)
+    assert asyncio.run(server.marcar_ready(intentos=5, espera=0)) is False
+    assert llamadas == ["/ready"]
+
+
 # --- Hallazgo 5: presentación mal formada → cierre limpio 4002 -----------------------
 @pytest.mark.parametrize("hola", ['{"hola": "texto"}', '{"hola": 5}', '{"otro": 1}', "[]"])
 def test_presentacion_mal_formada_cierra_con_4002(hola):
