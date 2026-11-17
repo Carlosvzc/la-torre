@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>La Torre — Reporte Unidad 3</title>
 <style>
-  @page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+  @page { size: letter; margin: 16mm 15mm 16mm 15mm; }
   :root { --tinta: #1d1d1f; --suave: #555; --linea: #d9d4c7; --oro: #8a6a1f; --fondo: #faf8f3; }
   * { box-sizing: border-box; }
   body { font-family: "Segoe UI", Arial, sans-serif; color: var(--tinta); font-size: 10.2pt; line-height: 1.42; margin: 0; background: #fff; }
@@ -20,12 +20,13 @@
   th { background: #efe9da; }
   td.n, th.n { text-align: right; white-space: nowrap; }
   .salto { break-before: page; }
-  .portada { height: 255mm; display: flex; flex-direction: column; justify-content: space-between; }
-  .portada h1 { font-size: 40pt; letter-spacing: 6px; color: #2a2108; }
-  .portada .sub { font-size: 14pt; color: var(--suave); margin-top: 6px; }
-  .portada img { width: 100%; border: 1px solid var(--linea); margin: 14px 0; }
-  .datos td { border: none; padding: 2px 0; font-size: 10.5pt; }
-  .datos td:first-child { color: var(--suave); width: 38%; }
+  /* Portada con el formato institucional: Arial negrita 14 pt, centrada, renglones separados y logos abajo */
+  .portada { position: relative; height: 240mm; break-after: page; font-family: Arial, Helvetica, sans-serif;
+             font-weight: bold; font-size: 14pt; text-align: center; color: #000; }
+  .portada p { margin: 0; line-height: 1.2; }
+  .portada .renglones { padding-top: 14mm; display: flex; flex-direction: column; gap: 12.5mm; }
+  .portada .logo-tecnm { position: absolute; left: -11mm; top: 158mm; width: 84mm; }
+  .portada .logo-itc { position: absolute; right: -2mm; top: 149mm; width: 52mm; }
   figure { margin: 8px 0 12px; break-inside: avoid; }
   figure img { width: 100%; border: 1px solid var(--linea); display: block; }
   figcaption { font-size: 8.6pt; color: var(--suave); margin-top: 3px; }
@@ -44,24 +45,23 @@
 
 <!-- ================= PORTADA ================= -->
 <section class="portada">
-  <div>
-    <p style="color:var(--suave);font-size:10pt;margin:0">Tecnológico Nacional de México · Campus Colima · Ingeniería en Inteligencia Artificial</p>
-    <p style="color:var(--suave);font-size:10pt;margin:0 0 26px">Cómputo en la Nube · Unidad 3: Infraestructura y despliegue de videojuegos en la nube</p>
-    <h1>LA TORRE</h1>
-    <p class="sub">Infraestructura, despliegue, autoescalado y pruebas de carga de un roguelike multijugador con IA en AWS — prácticas 3.1 a 3.6</p>
-    <img src="../capturas/juego-01-menu.png" alt="Menú de La Torre">
+  <div class="renglones">
+    <p>TECNOLÓGICO NACIONAL DE MÉXICO</p>
+    <p>INGENIERIA EN INTELIGENCIA ARTIFICIAL</p>
+    <p>COMPUTO EN LA NUBE</p>
+    <p>UNIDAD 3: INFRAESTRUCTURA Y DESPLIEGUE DE VIDEOJUEGOS<br>EN LA NUBE — PROYECTO "LA TORRE" EN AWS</p>
+    <p>PROFESOR: JOEL MONICO SANCHEZ VELASCO</p>
+    <p>ALUMNO: CARLOS ALEJANDRO VIZCAINO ANGUIANO</p>
+    <p>16/11/2026</p>
   </div>
-  <table class="datos">
-    <tr><td>Alumno</td><td>Carlos Alejandro Vizcaíno Anguiano</td></tr>
-    <tr><td>Modalidad</td><td>Individual</td></tr>
-    <tr><td>Nube</td><td>Amazon Web Services, región us-east-2 (Ohio)</td></tr>
-    <tr><td>Repositorio</td><td>https://github.com/Carlosvzc/la-torre (privado)</td></tr>
-    <tr><td>Fecha</td><td>16 de noviembre de 2026</td></tr>
-  </table>
+  <img class="logo-tecnm" src="img/logo-tecnm.png" alt="Tecnológico Nacional de México">
+  <img class="logo-itc" src="img/logo-itcolima.png" alt="Instituto Tecnológico de Colima">
 </section>
 
 <!-- ================= 1. EL JUEGO ================= -->
-<h2 class="salto">1. El juego y la adaptación del caso de estudio</h2>
+<h2 style="margin-top:0">1. El juego y la adaptación del caso de estudio</h2>
+<p style="font-size:9.4pt;color:var(--suave)">Trabajo individual · AWS us-east-2 (Ohio) · Repositorio: https://github.com/Carlosvzc/la-torre (privado)</p>
+<figure><img src="../capturas/juego-01-menu.png" alt="Menú de La Torre"><figcaption>Menú de La Torre: 4 clases y 3 modos de juego.</figcaption></figure>
 <p>El material usa como caso <i>Nebula Arena</i> (shooter 5 vs 5). Lo adapté a mi propio juego, <b>La Torre</b>: un roguelike en el que
 un grupo sube una torre de <b>4 pisos con un jefe en cada uno</b>. Entre piso y piso cada jugador elige una mejora
 ("bendición"). Todo lo que pasa en el juego lo decide el servidor (<b>servidor autoritativo</b>): el cliente solo manda acciones
