@@ -4,6 +4,10 @@ Roguelike de caballero contra 4 jefes, con servidor autoritativo y flota en Agon
 Adapta las prácticas 3.1 a 3.6 del PDF (Nebula Arena) a este juego.
 Entrega: **16 nov 2026**. Trabajo individual.
 
+> **Nota del 16/11/2026:** este plan se escribió pensando en Google Cloud (GKE, Cloud Run, Firestore).
+> La entrega final se hizo en **AWS** (EKS, Lambda, DynamoDB, ECR). Lo que realmente se construyó y
+> midió está en `docs/practica-3.x.md` y en `docs/reporte/La-Torre-Reporte-Unidad3.pdf`.
+
 > Regla de oro: **todo local hasta que haya cuenta de nube.** Nada de `gcloud`/`aws`/`terraform apply`
 > que cree recursos sin explicar qué hace, cuánto cuesta (confirmado en la calculadora) y tener tu OK.
 > Ningún resultado de carga ni costo se inventa: solo se reporta lo medido.
