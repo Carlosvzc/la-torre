@@ -111,3 +111,13 @@ pública USD 0.005/h, EKS USD 0.10/h, salida a internet USD 0.09/GB (primeros 10
 - `docs/capturas/3.4-01-grafana.png`: tablero con 112 jugadores, servidores Allocated y nodos 4 → 8
 - `docs/capturas/3.4-02-locust.png`: resumen de Locust de la rampa
 - `docs/capturas/3.4-03-nodos-escalando.png`: `kubectl get nodes` con 4 nodos nuevos (4–9 min de edad)
+
+## Egress de espectadores extrapolado a 20 000 (fórmula del material)
+
+GB/hora = CCV × kbps × 3600 / 8 000 000. Precios de salida a internet en us-east-2: USD 0.09/GB (primeros
+10 TB del mes) a 0.05/GB (más de 150 TB).
+
+| Caso | kbps por espectador | Datos en una hora | Costo de la hora |
+|---|---|---|---|
+| Estado del juego (medido) | 57 | 513 GB | USD 26–46 |
+| Video 1080p (6 000 kbps) | 6 000 | 54 000 GB (54 TB) | USD 2 700–4 860 (≈ 4 599 con los tramos desde el inicio del mes) |

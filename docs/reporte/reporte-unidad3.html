@@ -294,8 +294,21 @@ de 80 ms, la capacidad la marcó la reserva de CPU y no la latencia.</p>
   <figure><img src="../capturas/3.4-03-nodos-escalando.png" alt="nodos"><figcaption>Figura 19. Cuatro nodos nuevos agregados por el Cluster Autoscaler.</figcaption></figure>
 </div>
 <figure class="ancho-80"><img src="../capturas/3.4-02-locust.png" alt="Locust"><figcaption>Figura 20. Resumen de Locust de la rampa.</figcaption></figure>
-<p>Con estos datos, la configuración que recomiendo es la de la tabla 8.</p>
-<p class="tabla-titulo">Tabla 8. Recomendación de configuración.</p>
+<p>El material también pide aplicar la fórmula de egress a los espectadores y extrapolar a 20 000 espectadores durante una hora
+(GB/hora = CCV × kbps × 3600 / 8 000 000). Lo calculé con lo que medí, que es el estado del juego que reciben mis espectadores, y con
+el video a 1080p (6 000 kbps) que propone el material, usando los precios de salida a internet de us-east-2 (tabla 8).</p>
+<p class="tabla-titulo">Tabla 8. Egress de 20 000 espectadores durante una hora.</p>
+<table>
+  <tr><th>Caso</th><th class="n">kbps por espectador</th><th class="n">Datos en una hora</th><th class="n">Costo de la hora</th></tr>
+  <tr><td>Estado del juego (medido)</td><td class="n">57</td><td class="n">513 GB (0.51 TB)</td><td class="n">26 a 46 USD</td></tr>
+  <tr><td>Video 1080p</td><td class="n">6 000</td><td class="n">54 000 GB (54 TB)</td><td class="n">2 700 a 4 860 USD</td></tr>
+</table>
+<p>El rango de costo sale de los precios por GB, que van de 0.09 dólares en los primeros 10 TB del mes a 0.05 después de 150 TB; si
+esa hora fuera la primera del mes, con los tramos de AWS costaría unos 4 599 dólares. El video a 1080p genera unas 105 veces más datos
+que mandar el estado del juego, por eso en un juego real los espectadores se atienden con una CDN y varias calidades de video, y no
+desde los servidores de partida.</p>
+<p>Con estos datos, la configuración que recomiendo es la de la tabla 9.</p>
+<p class="tabla-titulo">Tabla 9. Recomendación de configuración.</p>
 <table>
   <tr><th>Parámetro</th><th>Usado</th><th>Recomendado</th><th>Razón</th></tr>
   <tr><td>CPU reservada por GameServer</td><td>250m</td><td>50m</td><td>El consumo real fue de 17.7m; la reserva fue lo que llenó los nodos.</td></tr>
@@ -321,7 +334,7 @@ hay que declararlos.</p>
 <p>La prueba de carga fue con Locust y 500 usuarios durante 5 minutos, con 80 % de consultas del top y 20 % de registros. Para las
 escrituras usé un grupo fijo de 200 jugadores; si cada escritura creara un jugador nuevo, la tabla crecería sin parar y cada consulta
 saldría más cara (calculé unos 2 dólares contra 35 centavos).</p>
-<p class="tabla-titulo">Tabla 9. Resultados de la prueba 80/20.</p>
+<p class="tabla-titulo">Tabla 10. Resultados de la prueba 80/20.</p>
 <table>
   <tr><th>Operación</th><th class="n">Peticiones</th><th class="n">Rechazadas (429)</th><th class="n">p50</th><th class="n">p95</th><th class="n">p99</th></tr>
   <tr><td>Consultar el top (80 %)</td><td class="n">106 666</td><td class="n">80.2 %</td><td class="n">71 ms</td><td class="n">150 ms</td><td class="n">360 ms</td></tr>
@@ -336,10 +349,10 @@ altos del final de la distribución; esos vienen de la saturación.</p>
   <figure><img src="../capturas/3.5-02-concurrencia.png" alt="Concurrencia"><figcaption>Figura 23. Concurrencia en 10 y rechazos por minuto en CloudWatch.</figcaption></figure>
   <figure><img src="../capturas/3.5-03-locust.png" alt="Locust"><figcaption>Figura 24. Resumen de Locust de la prueba 80/20.</figcaption></figure>
 </div>
-<p>Para comparar costos supuse un mes con un millón de peticiones (tabla 10). Con los precios oficiales, la opción serverless sale más
+<p>Para comparar costos supuse un mes con un millón de peticiones (tabla 11). Con los precios oficiales, la opción serverless sale más
 barata hasta unos 9 millones de peticiones al mes, y cuando nadie juega cuesta casi nada. El servidor de partida no puede ser
 serverless porque guarda la partida en memoria y mantiene conexiones abiertas mucho tiempo.</p>
-<p class="tabla-titulo">Tabla 10. Costo mensual con un millón de peticiones.</p>
+<p class="tabla-titulo">Tabla 11. Costo mensual con un millón de peticiones.</p>
 <table>
   <tr><th>Opción</th><th class="n">USD/mes</th></tr>
   <tr><td>Lambda y DynamoDB</td><td class="n">1.33</td></tr>
@@ -352,9 +365,9 @@ serverless porque guarda la partida en memoria y mantiene conexiones abiertas mu
 <p>La carpeta infra del repositorio describe toda la infraestructura: la red, el clúster EKS con su grupo de nodos, Agones y el
 Cluster Autoscaler instalados con Helm desde Terraform, ECR, la Lambda con su URL, DynamoDB, los roles y la alerta de presupuesto de
 10 dólares. El estado se guarda en un bucket de S3 con bloqueo, y antes de aplicar revisé el plan y su costo en un pull request.</p>
-<p>Al revisar el plan y al aplicarlo fueron saliendo varios problemas que tuve que corregir en el código (tabla 11). Varios tenían que ver con el costo o con
+<p>Al revisar el plan y al aplicarlo fueron saliendo varios problemas que tuve que corregir en el código (tabla 12). Varios tenían que ver con el costo o con
 recursos que podían quedarse cobrando después de destruir todo.</p>
-<p class="tabla-titulo">Tabla 11. Problemas encontrados y cómo los resolví.</p>
+<p class="tabla-titulo">Tabla 12. Problemas encontrados y cómo los resolví.</p>
 <table>
   <tr><th>Problema</th><th>Solución</th></tr>
   <tr><td>La versión de EKS por defecto (1.32) habría entrado en soporte extendido, que cuesta 0.50 dólares más por hora.</td><td>Usar EKS 1.35, que Agones 1.62 soporta.</td></tr>
@@ -381,10 +394,10 @@ conserva es el bucket del estado, que cuesta centavos.</p>
 <!-- Costos y conclusiones -->
 <h2>8. Costos y capacidad</h2>
 <p>Con los precios oficiales de us-east-2 calculé el costo por hora y por jugador de lo que medí, y lo extrapolé a 20 000 jugadores
-(tabla 12). La extrapolación supone que el consumo por servidor y por jugador crece de forma lineal. Para 20 000 jugadores harían
+(tabla 13). La extrapolación supone que el consumo por servidor y por jugador crece de forma lineal. Para 20 000 jugadores harían
 falta 6 667 servidores; con la reserva actual de 250m serían unos 953 nodos, y con la reserva ajustada a 50m bajarían a unos 267. El
 egress sería de unos 2.4 Gbps, alrededor de 1 071 GB por hora, que cuestan entre 0.05 y 0.09 dólares por GB según el volumen.</p>
-<p class="tabla-titulo">Tabla 12. Costo por hora y por jugador.</p>
+<p class="tabla-titulo">Tabla 13. Costo por hora y por jugador.</p>
 <table>
   <tr><th>Escenario</th><th class="n">Cómputo USD/h</th><th class="n">Egress USD/h</th><th class="n">USD por jugador-hora</th></tr>
   <tr><td>Medido: 120 jugadores en 8 nodos</td><td class="n">0.82</td><td class="n">0.58</td><td class="n">0.0117</td></tr>
