@@ -4,7 +4,10 @@ Roguelike de un caballero contra 4 jefes seguidos, con **servidor autoritativo**
 flota de **Agones** sobre Kubernetes. Es el proyecto de la Unidad 3 de Cómputo en la Nube
 (Infraestructura y despliegue de videojuegos en la nube, TecNM Colima).
 
-El plan completo y el avance están en [PLAN.md](PLAN.md).
+**Entrega de la Unidad 3 (AWS, us-east-2):** el reporte está en
+[docs/reporte/La-Torre-Reporte-Unidad3.pdf](docs/reporte/La-Torre-Reporte-Unidad3.pdf) y el detalle de cada
+práctica en `docs/practica-3.x.md`. El plan inicial (escrito cuando la nube aún era Google Cloud) está
+en [PLAN.md](PLAN.md).
 
 ## Cómo jugar (reglas)
 - Vida, resistencia (stamina), ataque, esquiva con invulnerabilidad breve y una habilidad por clase.
@@ -61,8 +64,11 @@ pytest -q server
 | Carpeta | Contenido | Práctica |
 |---|---|---|
 | `server/` | Servidor del juego, pruebas y Dockerfile | 3.3, 3.2 |
-| `k8s/` | Fleet, FleetAutoscaler, PodMonitor | 3.3, 3.4 |
-| `loadtest/` | Locust: jugadores y espectadores simulados | 3.4 |
-| `serverless/` | Tabla de líderes (Cloud Run + Firestore) | 3.5 |
-| `infra/` | Terraform | 3.6 |
+| `k8s/` | Fleet, FleetAutoscaler, PodMonitor, asignación, Locust en el clúster y monitoreo | 3.3, 3.4 |
+| `loadtest/` | Locust: jugadores, espectadores y tabla de líderes; resultados y gráficas | 3.4, 3.5 |
+| `serverless/` | Tabla de líderes (AWS Lambda + DynamoDB) | 3.5 |
+| `infra/` | Terraform para AWS (VPC, EKS, Agones, ECR, Lambda, presupuesto) | 3.6 |
 | `ia/` | Entrenamiento del bot | 3.1 |
+| `grafana/` | Tablero de Grafana (CCU, tick p99, servidores, nodos, egress) | 3.4 |
+| `.github/workflows/` | Pipeline CI/CD | 3.2 |
+| `docs/` | Prácticas, capturas y reporte final | todas |

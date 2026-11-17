@@ -1,53 +1,34 @@
-# Capturas de pantalla para la entrega (AWS, us-east-2)
+# Capturas de la entrega (AWS us-east-2, 16/11/2026)
 
-Guárdalas en `docs/capturas/` con el nombre indicado. Que se vea la **fecha/hora** (barra de
-tareas de Windows) y el comando completo. Te aviso en el chat cuándo tomar cada una.
+Todas están en `docs/capturas/` y aparecen en el reporte (`docs/reporte/La-Torre-Reporte-Unidad3.pdf`).
 
-## 3.1 — Bot de IA
-| Archivo | Qué debe verse |
-|---|---|
-| `3.1-01-entrenamiento.png` | Terminal con `python ia\entrenar.py --device cpu --pasos 100000` y su tiempo |
-| `3.1-02-medir.png` | Salida de `python ia\medir.py ia\modelos\bot_cpu_1m_8env.zip` (victorias, latencias, vCPU) |
-| `3.1-03-colab-gpu.png` | (si se hace) notebook de Colab con la GPU T4 y la tabla CPU vs GPU |
+| Práctica | Archivo | Qué muestra |
+|---|---|---|
+| — | `3.0-presupuesto.png` | Alerta de presupuesto de USD 10 en AWS Budgets |
+| 3.1 | `3.1-01-entrenamiento.png` | Entrenamiento de 100 000 pasos en CPU (160.4 s) |
+| 3.1 | `3.1-02-medir.png` | `medir.py`: victorias, latencia de inferencia, vCPU |
+| 3.2 | `3.2-01-pipeline-verde.png` | GitHub Actions con los dos trabajos en verde |
+| 3.2 | `3.2-02-imagen-sha.png` | Imagen en ECR con la etiqueta del commit |
+| 3.2 | `3.2-03-flota-actualizada.png` | Flota con la imagen nueva; la partida asignada conserva la anterior |
+| 3.3 | `3.3-01-docker-run.png` | Servidor en un contenedor local |
+| 3.3 | `3.3-02-metrics.png`, `3.3-02b-metrics-final.png` | Métricas `torre_*` en `/metrics` |
+| 3.3 | `3.3-03-eks-nodos.png` | `kubectl get nodes` en EKS |
+| 3.3 | `3.3-04-gameservers-antes.png` | GameServers en Ready |
+| 3.3 | `3.3-05a-asignacion.png`, `3.3-05b-gameservers-despues.png` | GameServerAllocation: uno pasa a Allocated |
+| 3.3 | `3.3-06a-borrar-pod.png`, `3.3-06b-flota-repuesta.png` | Borrar el pod Allocated y la flota reponiéndolo |
+| 3.3 | `3.3-07-ecr.png` | Repositorio `torre-server` en ECR |
+| 3.4 | `3.4-01-grafana.png` | Tablero de Grafana durante la rampa |
+| 3.4 | `3.4-02-locust.png` | Resumen de Locust de la rampa |
+| 3.4 | `3.4-03-nodos-escalando.png` | Nodos nuevos agregados por el Cluster Autoscaler |
+| 3.4 | `loadtest/resultados/ccu_vs_p95.png`, `escalado.png`, `errores.png` | Gráficas generadas con `analizar.py` |
+| 3.5 | `3.5-01a-url-post.png`, `3.5-01b-url-get.png` | POST y GET a la Function URL |
+| 3.5 | `3.5-02-concurrencia.png` | CloudWatch: ConcurrentExecutions y Throttles |
+| 3.5 | `3.5-03-locust.png` | Resumen de Locust de la prueba 80/20 |
+| 3.6 | `3.6-01-pr-plan.png`, `3.6-01b-pr-costos.png` | Pull request con el `terraform plan` y su costo |
+| 3.6 | `3.6-02-apply.png` | Plan sin cambios y salidas de Terraform |
+| 3.6 | `3.6-03-cluster.png` | Clúster EKS activo en la consola |
+| 3.6 | `3.6-04-destroy.png` | `Destroy complete! Resources: 38 destroyed.` |
+| 3.6 | `3.6-05-sin-huerfanos.png` | `scripts/comprobar-huerfanos.ps1` sin recursos |
+| Juego | `juego-01-menu.png`, `juego-02-combate.png`, `juego-03-mejoras.png` | Menú, combate y mejoras |
 
-## 3.3 — Contenedores y Agones
-| Archivo | Qué debe verse |
-|---|---|
-| `3.3-01-docker-run.png` | `docker run --rm -p 7654:7654 -p 9100:9100 torre-server:1.5` arrancando |
-| `3.3-02-metrics.png` | `curl.exe -s localhost:9100/metrics` filtrado a `torre_` con jugadores > 0 |
-| `3.3-03-eks-nodos.png` | `kubectl get nodes` del clúster EKS |
-| `3.3-04-gameservers-antes.png` | `kubectl get gameservers` con los servidores en **Ready** |
-| `3.3-05-gameservers-despues.png` | Tras `kubectl create -f k8s/asignacion.yaml`: uno en **Allocated** |
-| `3.3-06-borrar-allocated.png` | `kubectl delete pod <pod Allocated>` y lo que hace la flota |
-| `3.3-07-ecr.png` | Consola de AWS → ECR → `torre-server` con la imagen y su etiqueta |
-
-## 3.2 — CI/CD
-| Archivo | Qué debe verse |
-|---|---|
-| `3.2-01-pipeline-verde.png` | GitHub → Actions → la corrida en verde con los dos trabajos |
-| `3.2-02-imagen-sha.png` | ECR con la imagen etiquetada con el SHA del commit |
-| `3.2-03-flota-actualizada.png` | `kubectl get gameservers` tras actualizar la flota a la imagen nueva |
-
-## 3.4 — Carga y autoescalado
-| Archivo | Qué debe verse |
-|---|---|
-| `3.4-01-grafana.png` | Tablero "La Torre" en Grafana durante la prueba |
-| `3.4-02-locust.png` | Resumen de Locust al terminar la rampa |
-| `3.4-03-nodos-escalando.png` | `kubectl get nodes` con nodos nuevos agregados por el autoescalado |
-| Gráficas | `loadtest/resultados/ccu_vs_p95.png`, `escalado.png`, `errores.png` (se generan solas) |
-
-## 3.5 — Serverless
-| Archivo | Qué debe verse |
-|---|---|
-| `3.5-01-url.png` | `curl` a la Function URL: POST de un resultado y GET del top |
-| `3.5-02-concurrencia.png` | CloudWatch → Lambda → `ConcurrentExecutions` durante la prueba 80/20 |
-| `3.5-03-locust.png` | Resumen de Locust de la prueba 80/20 (p50, p99, errores) |
-
-## 3.6 — Terraform
-| Archivo | Qué debe verse |
-|---|---|
-| `3.6-01-pr-plan.png` | El pull request #1 con el plan revisado |
-| `3.6-02-apply.png` | Final de `terraform apply`: `Apply complete! Resources: 60 added` y las salidas |
-| `3.6-03-cluster.png` | Consola de AWS → EKS → clúster `la-torre-default` activo |
-| `3.6-04-destroy.png` | Final de `terraform destroy`: `Destroy complete!` |
-| `3.6-05-sin-huerfanos.png` | Comprobación de que no quedan EKS, EC2, ECR ni Lambda del proyecto |
+No se tomaron: la GPU de Colab (3.1, no medida).

@@ -55,8 +55,8 @@ otro proceso que los jugadores y no encontraron runs (4 710 errores `sin_runs`).
 - **Tiempo de reacción de nodos:** primer pod pendiente a los 80 s → primer nodo nuevo listo a los
   288 s = **208 s (≈ 3.5 min)**, con muestreo de ≈ 11 s. Ese tiempo incluye la decisión del Cluster
   Autoscaler, el arranque de la instancia EC2 y su registro en el clúster.
-- **Límite alcanzado:** con 8 nodos, a partir del minuto 10–11 los Allocated se quedaron en **35** (≈ 105
-  jugadores) y los pods pendientes subieron a 10. Por eso fallaron las asignaciones del final: no es el
+- **Límite alcanzado:** con 8 nodos, a partir del minuto 10–11 los Allocated se quedaron entre **35 y 39** (≈ 105–117
+  jugadores, ~13–15 por nodo) y los pods pendientes subieron a 10. Por eso fallaron las asignaciones del final: no es el
   servidor el que se satura (tick p99 2 ms), sino la **reserva de CPU del clúster** (8 nodos × 2 vCPU con
   250m por GameServer, más Agones, Prometheus y el propio Locust).
 

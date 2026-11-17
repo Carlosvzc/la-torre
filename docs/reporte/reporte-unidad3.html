@@ -248,8 +248,10 @@ completas con la estrategia de los bots y mide el RTT con un ping por segundo.</
   <tr><th>Capa de autoescalado</th><th>Qué pasó (medido)</th></tr>
   <tr><td>Agones FleetAutoscaler</td><td>GameServers de 5 a <b>54</b>. Los Allocated siguen a los jugadores (≈ 1 por grupo de 3).</td></tr>
   <tr><td>Cluster Autoscaler</td><td>Nodos de 4 a <b>8</b> (tope): +1 a los 288 s, 366 s, 458 s y 540 s.</td></tr>
-  <tr><td>Límite</td><td>Con 8 nodos se llegó a <b>35 Allocated (~105 jugadores)</b>; después hubo hasta 10 pods pendientes y asignaciones sin
+  <tr><td>Límite</td><td>Con 8 nodos se llegó a <b>35–39 Allocated (~105–117 jugadores)</b>; después hubo hasta 10 pods pendientes y asignaciones sin
   servidor libre. Lo que se agotó fue la <b>CPU reservada</b> (250m por servidor), no el servidor del juego.</td></tr>
+  <tr><td>Capacidad por nodo</td><td>Medida: <b>~13–15 jugadores por nodo</b> (105–117 en 8 nodos que también corrían Agones, Prometheus y Locust).
+  Teórica con 250m: 7 servidores = 21 jugadores por nodo c7i-flex.large.</td></tr>
 </table>
 <div class="dos">
 <div>
@@ -262,7 +264,7 @@ completas con la estrategia de los bots y mide el RTT con un ping por segundo.</
   <tr><td>Runs completas en la rampa</td><td class="n">172 (65 victorias)</td></tr>
 </table>
 <p style="font-size:9pt">Como el RTT nunca se acercó a la meta de 80 ms, la capacidad no la marcó la latencia sino la reserva de CPU: con
-250m por servidor caben ~7 servidores por nodo c7i-flex.large (~21 jugadores). Medido: ~105 jugadores en 8 nodos que también
+250m por servidor caben ~7 servidores por nodo c7i-flex.large (~21 jugadores). Medido: ~105–117 jugadores en 8 nodos que también
 corrían Agones, Prometheus y Locust.</p>
 </div>
 <figure><img src="../../loadtest/resultados/escalado.png" alt="escalado"><figcaption>Línea de tiempo del autoescalado (<code>registrar_escalado.py</code>, cada ~11 s).</figcaption></figure>
@@ -272,6 +274,18 @@ corrían Agones, Prometheus y Locust.</p>
   <figure><img src="../capturas/3.4-03-nodos-escalando.png" alt="nodos"><figcaption>3.4-03 · 4 nodos nuevos de 4–9 minutos de edad, creados por el Cluster Autoscaler.</figcaption></figure>
   <figure><img src="../capturas/3.4-02-locust.png" alt="Locust"><figcaption>3.4-02 · Resumen de Locust de la rampa.</figcaption></figure>
 </div>
+<div class="dos">
+  <figure><img src="../../loadtest/resultados/ccu_vs_p95.png" alt="CCU vs p95"><figcaption>CCU contra latencia p95 (fila agregada de Locust). El pico inicial son las primeras asignaciones de servidor (300–500 ms) cuando aún había pocos pings. Después, el p95 se queda en 1–4 ms hasta 120 jugadores: <b>nunca cruza la meta de 80 ms</b>.</figcaption></figure>
+  <figure><img src="../../loadtest/resultados/errores.png" alt="errores"><figcaption>Errores por segundo en el pico (30 jugadores + 30 espectadores). Son asignaciones que no encontraron servidor libre mientras la flota creaba más. Los espectadores tuvieron <b>0 snapshots tardíos</b>.</figcaption></figure>
+</div>
+<h3>Recomendación de configuración (con base en los datos)</h3>
+<table>
+  <tr><th>Parámetro</th><th>Usado</th><th>Recomendado</th><th>Por qué (dato medido)</th></tr>
+  <tr><td>Reserva de CPU por GameServer</td><td>250 m</td><td><b>50 m</b></td><td>El consumo real fue 17.7 m; la reserva fue lo que llenó los nodos.</td></tr>
+  <tr><td><code>bufferSize</code></td><td>20 %</td><td><b>30 %</b> (y <code>minReplicas</code> ≥ 10 en eventos)</td><td>Con 20 % se agotaron los servidores libres en la rampa y en el pico (asignaciones fallidas); un nodo tarda ~3.5 min.</td></tr>
+  <tr><td>Tipo de máquina</td><td>c7i-flex.large</td><td><b>c7i-flex.large</b></td><td>El tick p99 fue ≤ 2.2 ms: la CPU sobra. Con 50 m el límite pasa a ser el de 29 pods por nodo, y una máquina más grande solo aumentaría ese tope.</td></tr>
+  <tr><td>Mínimo de nodos</td><td>2</td><td><b>2</b> normal; <b>pre-escalar</b> 15 min antes de un lanzamiento</td><td>Fuera de los eventos, 2 nodos bastan y cuidan el costo. La reacción de ~3.5 min por nodo no alcanza a cubrir un pico repentino.</td></tr>
+</table>
 <div class="nota"><b>Lo que no salió perfecto:</b> 302 veces un jugador simulado pasó más de 5 s sin recibir estado, casi siempre al cerrarse
 la run; la causa no se confirmó. El primer intento de pico con espectadores no sirvió (los espectadores quedaron en otro proceso de Locust)
 y lo repetí con 60 usuarios. Con <code>--processes</code>, Locust no guarda el historial del RTT por separado; la curva CCU-p95 automática
@@ -331,12 +345,12 @@ URL, DynamoDB, roles, alerta de presupuesto de USD 10 y la regla del webhook. El
 <b>"Destroy complete! Resources: 38 destroyed"</b> (la primera corrida ya había borrado el resto). <code>scripts/comprobar-huerfanos.ps1</code> confirmó que
 no quedó nada. Solo se conserva el bucket S3 del estado.</p>
 <div class="tres">
-  <figure><img src="../capturas/3.6-01b-pr-costos.png" alt="PR costos"><figcaption>3.6-01 · Pull request con el plan y el costo por hora.</figcaption></figure>
+  <figure><img src="../capturas/3.6-01b-pr-costos.png" alt="PR costos"><figcaption>3.6-01 · Pull request con el plan y el costo por hora, estimado aún con c7i.large antes de cambiar a c7i-flex.large (casi el mismo precio).</figcaption></figure>
   <figure><img src="../capturas/3.6-02-apply.png" alt="plan sin cambios"><figcaption>3.6-02 · Plan sin cambios y salidas de Terraform.</figcaption></figure>
   <figure><img src="../capturas/3.6-04-destroy.png" alt="destroy"><figcaption>3.6-04 · Destroy completo.</figcaption></figure>
   <figure><img src="../capturas/3.6-05-sin-huerfanos.png" alt="sin huérfanos"><figcaption>3.6-05 · Sin recursos huérfanos.</figcaption></figure>
   <figure><img src="../capturas/3.6-03-cluster.png" alt="cluster"><figcaption>3.6-03 · Clúster activo en la consola, en soporte estándar hasta marzo de 2027.</figcaption></figure>
-  <figure><img src="../capturas/3.0-presupuesto.png" alt="presupuesto"><figcaption>Alerta de presupuesto de USD 10 (creada antes de la primera práctica).</figcaption></figure>
+  <figure><img src="../capturas/3.0-presupuesto.png" alt="presupuesto"><figcaption>Alerta de presupuesto de USD 10, creada con Terraform en el mismo apply que la infraestructura.</figcaption></figure>
 </div>
 
 <!-- ================= CONCLUSIONES ================= -->
