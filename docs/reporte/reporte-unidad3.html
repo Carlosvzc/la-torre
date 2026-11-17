@@ -55,7 +55,7 @@
 <h2 style="margin-top:0">1. Introducción</h2>
 <p>En esta unidad el material de estudio explica cómo se monta la infraestructura de un videojuego en línea en la nube, usando como
 ejemplo un shooter llamado Nebula Arena. En lugar de seguir el ejemplo tal cual, decidí aplicar las seis prácticas a un juego propio
-que desarrollé durante el semestre, La Torre, y montarlo en Amazon Web Services (región us-east-2, Ohio). El trabajo fue individual.</p>
+que desarrollé para este proyecto, La Torre, y montarlo en Amazon Web Services (región us-east-2, Ohio). El trabajo fue individual.</p>
 <p>La Torre es un roguelike en el que un grupo de hasta tres jugadores sube una torre de cuatro pisos y en cada piso pelea contra un jefe.
 Al vencer a cada jefe, cada jugador escoge una mejora antes de seguir subiendo. Hay cuatro clases (caballero, bárbaro, cazadora y
 hechicero) y tres modos: solitario, solo con dos compañeros controlados por IA, y multijugador de hasta tres personas en red local.
@@ -195,7 +195,7 @@ las últimas 24 horas.</p>
   <tr><td>Entrenamiento en GPU</td><td>g4dn.xlarge (T4)</td><td class="n">0.526</td><td class="n">0.27 a 0.28</td><td class="n">-</td></tr>
 </table>
 <p>Servir los 2 000 bots cuesta 521 dólares al mes con PyTorch y 65 con numpy, y en la práctica la versión numpy cabe en los mismos
-nodos donde corren las partidas. El entrenamiento conviene hacerlo en instancias Spot, porque si AWS reclama la máquina se puede
+nodos donde corren las partidas. El entrenamiento conviene hacerlo en instancias Spot, que en la g4dn.xlarge cuestan casi la mitad, porque si AWS reclama la máquina se puede
 retomar desde el último checkpoint, pero la inferencia tiene que ir bajo demanda porque corre junto a las partidas y no se puede
 interrumpir. Si el entrenamiento de un millón de pasos tardara lo mismo en una c7i.2xlarge (USD 0.357/h) que en mi laptop, costaría
 unos 9 centavos, aunque esto es una suposición. No alcancé a medir la GPU en Colab, así que esa comparación queda pendiente; por lo
@@ -352,7 +352,7 @@ serverless porque guarda la partida en memoria y mantiene conexiones abiertas mu
 <p>La carpeta infra del repositorio describe toda la infraestructura: la red, el clúster EKS con su grupo de nodos, Agones y el
 Cluster Autoscaler instalados con Helm desde Terraform, ECR, la Lambda con su URL, DynamoDB, los roles y la alerta de presupuesto de
 10 dólares. El estado se guarda en un bucket de S3 con bloqueo, y antes de aplicar revisé el plan y su costo en un pull request.</p>
-<p>Al aplicar fueron saliendo varios problemas que tuve que corregir en el código (tabla 11). Varios tenían que ver con el costo o con
+<p>Al revisar el plan y al aplicarlo fueron saliendo varios problemas que tuve que corregir en el código (tabla 11). Varios tenían que ver con el costo o con
 recursos que podían quedarse cobrando después de destruir todo.</p>
 <p class="tabla-titulo">Tabla 11. Problemas encontrados y cómo los resolví.</p>
 <table>
