@@ -1,6 +1,6 @@
 # Capturas de la entrega (AWS us-east-2, 16/11/2026)
 
-Todas están en `docs/capturas/` y aparecen en el reporte (`docs/reporte/La-Torre-Reporte-Unidad3.pdf`).
+Todas están en `docs/capturas/` y aparecen en el reporte (`docs/reporte/La-Torre-Anexo-Practicas.pdf`).
 
 | Práctica | Archivo | Qué muestra |
 |---|---|---|

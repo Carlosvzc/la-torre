@@ -6,7 +6,7 @@ Entrega: **16 nov 2026**. Trabajo individual.
 
 > **Nota del 16/11/2026:** este plan se escribió pensando en Google Cloud (GKE, Cloud Run, Firestore).
 > La entrega final se hizo en **AWS** (EKS, Lambda, DynamoDB, ECR). Lo que realmente se construyó y
-> midió está en `docs/practica-3.x.md` y en `docs/reporte/La-Torre-Reporte-Unidad3.pdf`.
+> midió está en `docs/practica-3.x.md` y en `docs/reporte/La-Torre-Anexo-Practicas.pdf`.
 
 > Regla de oro: **todo local hasta que haya cuenta de nube.** Nada de `gcloud`/`aws`/`terraform apply`
 > que cree recursos sin explicar qué hace, cuánto cuesta (confirmado en la calculadora) y tener tu OK.
