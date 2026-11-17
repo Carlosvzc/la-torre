@@ -4,8 +4,9 @@ Roguelike de un caballero contra 4 jefes seguidos, con **servidor autoritativo**
 flota de **Agones** sobre Kubernetes. Es el proyecto de la Unidad 3 de Cómputo en la Nube
 (Infraestructura y despliegue de videojuegos en la nube, TecNM Colima).
 
-**Entrega de la Unidad 3 (AWS, us-east-2):** el reporte está en
-[docs/reporte/La-Torre-Reporte-Unidad3.pdf](docs/reporte/La-Torre-Reporte-Unidad3.pdf) y el detalle de cada
+**Entrega de la Unidad 3 (AWS, us-east-2):** el reporte técnico está en
+[docs/reporte/La-Torre-Reporte-Tecnico.pdf](docs/reporte/La-Torre-Reporte-Tecnico.pdf), el anexo con las prácticas en
+[docs/reporte/La-Torre-Anexo-Practicas.pdf](docs/reporte/La-Torre-Anexo-Practicas.pdf) y el detalle de cada
 práctica en `docs/practica-3.x.md`. El plan inicial (escrito cuando la nube aún era Google Cloud) está
 en [PLAN.md](PLAN.md).
 
