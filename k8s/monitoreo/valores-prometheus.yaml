@@ -1,0 +1,25 @@
+# kube-prometheus-stack para la práctica 3.4 (Prometheus + Grafana + kube-state-metrics).
+# helm upgrade --install monitoreo prometheus-community/kube-prometheus-stack -n monitoreo \
+#   --create-namespace -f k8s/monitoreo/valores-prometheus.yaml
+# Sin balanceadores ni discos: Grafana se abre con kubectl port-forward y los datos viven
+# solo mientras dure la prueba (nada que cobre ni que quede huérfano tras el destroy).
+alertmanager:
+  enabled: false
+prometheus:
+  prometheusSpec:
+    scrapeInterval: 15s
+    retention: 1d
+    # Que lea los PodMonitor/ServiceMonitor de cualquier namespace (los del juego y de Agones)
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    resources:
+      requests: { cpu: 200m, memory: 512Mi }
+grafana:
+  service:
+    type: ClusterIP
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: ALL
+nodeExporter:
+  enabled: true

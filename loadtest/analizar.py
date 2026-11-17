@@ -28,6 +28,11 @@ def historial(prefijo: str) -> pd.DataFrame:
 def grafica_ccu_p95(prefijo: str, resumen: list) -> None:
     h = historial(prefijo)
     rtt = h[h["Name"] == "rtt"].copy()
+    if rtt.empty:
+        # Con --processes, Locust solo guarda la fila "Aggregated" en el historial (sin --csv-full-history).
+        # El RTT es ~97 % de las peticiones, así que el p95 agregado es casi el del RTT (lo dice el resumen).
+        rtt = h[h["Name"] == "Aggregated"].copy()
+        resumen.append("Nota: historial sin fila 'rtt' (prueba con --processes); se usa el p95 agregado")
     rtt["p95"] = pd.to_numeric(rtt["95%"], errors="coerce")
     rtt = rtt.dropna(subset=["p95"])
     plt.figure(figsize=(7, 4))

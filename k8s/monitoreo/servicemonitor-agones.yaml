@@ -1,0 +1,14 @@
+# Métricas del controlador de Agones (agones_gameservers_count, agones_fleets_replicas_count, ...).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: agones-controller
+  namespace: agones-system
+spec:
+  selector:
+    matchLabels:
+      agones.dev/role: controller
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s

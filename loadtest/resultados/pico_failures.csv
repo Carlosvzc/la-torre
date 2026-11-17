@@ -1,0 +1,5 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+WS,conexion_espectador,"ConnectionRefusedError(111, 'Connection refused')",2,2026-11-16T20:43:56Z,2026-11-16T20:44:00Z
+ALLOC,asignacion,RuntimeError('sin servidores libres (UnAllocated)'),300,2026-11-16T20:41:32Z,2026-11-16T20:43:48Z
+WS,snapshot,WebSocketTimeoutException('Connection timed out'),8,2026-11-16T20:43:35Z,2026-11-16T20:43:58Z
+WS,conexion_espectador,SinRunsQueMirar('sin runs: lanza Jugador en el mismo comando o define ESPECTAR'),5,2026-11-16T20:41:30Z,2026-11-16T20:41:30Z

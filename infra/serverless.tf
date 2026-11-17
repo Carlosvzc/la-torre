@@ -63,6 +63,24 @@ resource "aws_lambda_function_url" "lideres" {
   }
 }
 
+# Una Function URL pública necesita DOS permisos en la política de la función (AWS los exige
+# desde 2025): InvokeFunctionUrl e InvokeFunction. La consola los agrega sola; Terraform no.
+# Sin ellos la URL responde 403 Forbidden (lo encontramos al probarla).
+resource "aws_lambda_permission" "url_publica" {
+  statement_id           = "url-publica"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.lideres.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}
+
+resource "aws_lambda_permission" "url_publica_invocar" {
+  statement_id  = "url-publica-invocar"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.lideres.function_name
+  principal     = "*"
+}
+
 resource "aws_cloudwatch_log_group" "lideres" {
   name              = "/aws/lambda/${aws_lambda_function.lideres.function_name}"
   retention_in_days = 3

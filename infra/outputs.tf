@@ -17,7 +17,7 @@ output "lambda_url" {
 
 output "rol_github_actions" {
   description = "Va en la variable AWS_ROLE_ARN del repositorio de GitHub"
-  value       = aws_iam_role.github.arn
+  value       = var.crear_oidc_github ? aws_iam_role.github[0].arn : "(sin OIDC: la SCP de la organización lo prohíbe)"
 }
 
 output "configurar_kubectl" {

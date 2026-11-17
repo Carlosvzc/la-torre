@@ -1,0 +1,6 @@
+Nota: historial sin fila 'rtt' (prueba con --processes); se usa el p95 agregado
+Máximo CCU medido: 120; p95 máximo: 500 ms
+Capacidad (primer CCU con p95 > 80 ms, o el máximo si nunca se pasó): 1
+Reacción de nodos: pods pendientes en t=80 s → nodo nuevo en t=288 s (208 s)
+GameServers: de 5 a 54; nodos: de 4 a 8
+Peticiones: 54947, fallos: 315 (0.57 %)

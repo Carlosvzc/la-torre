@@ -1,0 +1,83 @@
+inicio UTC: 20:18:29
+[2026-11-16 20:36:33,148] locust/INFO/locust.runners: The last worker quit, stopping test.
+[2026-11-16 20:36:33,148] locust/INFO/locust.main: Shutting down (exit code 0)
+[2026-11-16 20:36:34,082] locust/INFO/locust.main: Shutting down (exit code 1)
+Type     Name                                                                          # reqs      # fails |    Avg    
+ Min     Max    Med |   req/s  failures/s
+--------|----------------------------------------------------------------------------|-------|-------------|-------|---
+----|-------|-------|--------|-----------
+ALLOC    asignacion                                                                      1118  911(81.48%) |    360    
+  30     756    320 |    1.04        0.84
+WS       conexion                                                                         621    10(1.61%) |     14    
+   2     218      6 |    0.57        0.01
+WS       rtt                                                                            73537     0(0.00%) |      1    
+   0     421      1 |   68.09        0.00
+RUN      run_derrota                                                                      107     0(0.00%) | 127572   
+46750  229900 128000 |    0.10        0.00
+RUN      run_victoria                                                                      65     0(0.00%) | 133706   
+89250  272650 124000 |    0.06        0.00
+WS       snapshot                                                                         302 302(100.00%) |   5539    
+5000    9908   5000 |    0.28        0.28
+--------|----------------------------------------------------------------------------|-------|-------------|-------|---
+----|-------|-------|--------|-----------
+         Aggregated                                                                     75750  1223(1.61%) |    323    
+   0  272650      1 |   70.13        1.13
+Response time percentiles (approximated)
+Type     Name                                                                                  50%    66%    75%    
+80%    90%    95%    98%    99%  99.9% 99.99%   100% # reqs
+--------|--------------------------------------------------------------------------------|--------|------|------|------
+|------|------|------|------|------|------|------|------
+ALLOC    asignacion                                                                            320    500    500    
+500    510    520    540    590    680    760    760   1118
+WS       conexion                                                                                6      7      9      
+9     20     73    120    140    220    220    220    621
+WS       rtt                                                                                     1      1      1      
+1      2      2      4      6     25    400    420  73537
+RUN      run_derrota                                                                        128000 141000 156000 
+160000 180000 186000 195000 223000 230000 230000 230000    107
+RUN      run_victoria                                                                       124000 143000 149000 
+154000 177000 186000 226000 273000 273000 273000 273000     65
+WS       snapshot                                                                             5000   5000   5000   
+5500   7800   8500   9200   9400   9900   9900   9900    302
+--------|--------------------------------------------------------------------------------|--------|------|------|------
+|------|------|------|------|------|------|------|------
+         Aggregated                                                                              1      1      1      
+1      2      4    190    500 133000 190000 273000  75750
+Error report
+# occurrences      Error                                                                                               
+------------------|----------------------------------------------------------------------------------------------------
+-----------------------------------------
+911                ALLOC asignacion: RuntimeError('sin servidores libres (UnAllocated)')                               
+1                  WS conexion: WebSocketException("respuesta inesperada: {'modo': 'torre', 'estado': 'esperando', 
+'piso': 1, 'pisos': 4, 't': 0.0, 'jugadores': {'bot-5ab627': {'x': 10.0, 'y': 3.0, 'dx': 0.0, 'dy': 1.0, 'vida': 110, 
+'vida_max': 110, 'st': 100, 'st_max': 100, 'estado': 'libre', 'clase': 'caballero', 'recarga': 0.0}, 'bot-17273a': 
+{'x': 10.0, 'y': 3.0, 'dx': 0.0, 'dy': 1.0, 'vida': 135, 'vida_max': 135, 'st': 110, 'st_max': 110, 'estado': 'libre', 
+'clase': 'barbaro', 'recarga': 0.0}}, 'jefe': None, 'eventos': [{'tipo': 'entra', 'jugador': 'bot-5ab627', 'clase': 
+'caballero'}, {'tipo': 'entra', 'jugador': 'bot-17273a', 'clase': 'barbaro'}], 'inicio_en': 60.0, 'sala': 'grupo', 
+'max': 3, 'listos': []}")
+5                  WS conexion: Rechazado('4004: ese id ya estÃ¡ en la partida')                                        
+1                  WS conexion: WebSocketException("respuesta inesperada: {'modo': 'torre', 'estado': 'esperando', 
+'piso': 1, 'pisos': 4, 't': 0.0, 'jugadores': {'bot-ab6cda': {'x': 10.0, 'y': 3.0, 'dx': 0.0, 'dy': 1.0, 'vida': 75, 
+'vida_max': 75, 'st': 120, 'st_max': 120, 'estado': 'libre', 'clase': 'hechicero', 'recarga': 0.0}}, 'jefe': None, 
+'eventos': [{'tipo': 'entra', 'jugador': 'bot-ab6cda', 'clase': 'hechicero'}], 'inicio_en': 60.0, 'sala': 'grupo', 
+'max': 3, 'listos': []}")
+302                WS snapshot: WebSocketTimeoutException('Connection timed out')                                      
+1                  WS conexion: WebSocketException("respuesta inesperada: {'modo': 'torre', 'estado': 'esperando', 
+'piso': 1, 'pisos': 4, 't': 0.0, 'jugadores': {'bot-f0d3e2': {'x': 10.0, 'y': 3.0, 'dx': 0.0, 'dy': 1.0, 'vida': 110, 
+'vida_max': 110, 'st': 100, 'st_max': 100, 'estado': 'libre', 'clase': 'caballero', 'recarga': 0.0}}, 'jefe': None, 
+'eventos': [{'tipo': 'entra', 'jugador': 'bot-f0d3e2', 'clase': 'caballero'}], 'inicio_en': 60.0, 'sala': 'grupo', 
+'max': 3, 'listos': []}")
+1                  WS conexion: WebSocketException("respuesta inesperada: {'modo': 'torre', 'estado': 'esperando', 
+'piso': 1, 'pisos': 4, 't': 0.0, 'jugadores': {'bot-c33cd4': {'x': 10.0, 'y': 3.0, 'dx': 0.0, 'dy': 1.0, 'vida': 75, 
+'vida_max': 75, 'st': 120, 'st_max': 120, 'estado': 'libre', 'clase': 'hechicero', 'recarga': 0.0}}, 'jefe': None, 
+'eventos': [{'tipo': 'entra', 'jugador': 'bot-c33cd4', 'clase': 'hechicero'}], 'inicio_en': 60.0, 'sala': 'grupo', 
+'max': 3, 'listos': []}")
+1                  WS conexion: WebSocketException("respuesta inesperada: {'modo': 'torre', 'estado': 'esperando', 
+'piso': 1, 'pisos': 4, 't': 0.0, 'jugadores': {'bot-acc105': {'x': 10.0, 'y': 3.0, 'dx': 0.0, 'dy': 1.0, 'vida': 80, 
+'vida_max': 80, 'st': 100, 'st_max': 100, 'estado': 'libre', 'clase': 'cazadora', 'recarga': 0.0}}, 'jefe': None, 
+'eventos': [{'tipo': 'entra', 'jugador': 'bot-acc105', 'clase': 'cazadora'}], 'inicio_en': 60.0, 'sala': 'grupo', 
+'max': 3, 'listos': []}")
+------------------|----------------------------------------------------------------------------------------------------
+-----------------------------------------
+command terminated with exit code 1
+fin UTC: 20:36:35

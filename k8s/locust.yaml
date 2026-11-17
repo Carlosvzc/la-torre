@@ -1,0 +1,52 @@
+# Locust dentro del clúster (práctica 3.4). Pide GameServers con la API de Kubernetes, así que
+# su cuenta de servicio solo puede crear GameServerAllocations en "default".
+# IMAGEN_LOCUST se reemplaza al desplegar. La prueba se lanza con "kubectl exec" (ver docs/practica-3.4.md).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: locust
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: locust-asignar
+  namespace: default
+rules:
+  - apiGroups: ["allocation.agones.dev"]
+    resources: ["gameserverallocations"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: locust-asignar
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: locust
+    namespace: default
+roleRef:
+  kind: Role
+  name: locust-asignar
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: locust
+  namespace: default
+  labels: { app: locust }
+spec:
+  serviceAccountName: locust
+  restartPolicy: Never
+  containers:
+    - name: locust
+      image: IMAGEN_LOCUST
+      command: ["sleep", "infinity"]
+      env:
+        - { name: ASIGNAR_K8S, value: "1" }
+        - { name: JUGADORES_POR_RUN, value: "3" }
+      resources:
+        # CPU propia para que el generador no compita con los GameServers por el mismo núcleo
+        requests: { cpu: "1500m", memory: 1Gi }

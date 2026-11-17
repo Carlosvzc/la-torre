@@ -43,6 +43,8 @@ from estrategia import decidir
 
 SERVIDOR_WS = os.getenv("SERVIDOR_WS", "")
 ALLOCATOR_IP = os.getenv("ALLOCATOR_IP", "")
+ASIGNAR_K8S = os.getenv("ASIGNAR_K8S", "") == "1"     # Locust dentro del clúster (práctica 3.4 en EKS)
+SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount"
 FLOTA = os.getenv("FLOTA", "torre-fleet")
 GRUPO = max(1, min(3, int(os.getenv("JUGADORES_POR_RUN", "2"))))   # el servidor admite hasta 3
 HABILIDAD = float(os.getenv("HABILIDAD", "0.85"))
@@ -108,8 +110,10 @@ class Emparejador:
     def _nuevo_servidor() -> str:
         if SERVIDOR_WS:
             return SERVIDOR_WS
+        if ASIGNAR_K8S:
+            return Emparejador._asignar_k8s()
         if not ALLOCATOR_IP:
-            raise RuntimeError("define SERVIDOR_WS (local) o ALLOCATOR_IP (Agones)")
+            raise RuntimeError("define SERVIDOR_WS (local), ALLOCATOR_IP o ASIGNAR_K8S=1 (Agones)")
         t0 = time.perf_counter()
         pedido = {"namespace": "default",
                   "gameServerSelectors": [{"matchLabels": {"agones.dev/fleet": FLOTA}}]}
@@ -119,6 +123,31 @@ class Emparejador:
             gs = r.json()
             medir("ALLOC", "asignacion", t0)
             return f"ws://{gs['address']}:{gs['ports'][0]['port']}"
+        except Exception as e:
+            medir("ALLOC", "asignacion", t0, e)
+            raise
+
+    @staticmethod
+    def _asignar_k8s() -> str:
+        """Locust corre como pod en el clúster: crea un GameServerAllocation con la API de Kubernetes
+        (lo mismo que `kubectl create -f k8s/asignacion.yaml`) usando el token de su cuenta de servicio.
+        Se usa la IP interna del nodo: el tráfico no sale de la VPC (misma región, sin latencia de internet)."""
+        t0 = time.perf_counter()
+        pedido = {"apiVersion": "allocation.agones.dev/v1", "kind": "GameServerAllocation",
+                  "spec": {"selectors": [{"matchLabels": {"agones.dev/fleet": FLOTA}}]}}
+        try:
+            with open(f"{SA_DIR}/token") as f:
+                token = f.read().strip()
+            r = requests.post(f"https://kubernetes.default.svc/apis/allocation.agones.dev/v1/namespaces/default/"
+                              "gameserverallocations", json=pedido, timeout=10, verify=f"{SA_DIR}/ca.crt",
+                              headers={"Authorization": f"Bearer {token}"})
+            r.raise_for_status()
+            st = r.json()["status"]
+            if st.get("state") != "Allocated":
+                raise RuntimeError(f"sin servidores libres ({st.get('state')})")
+            ip = next((a["address"] for a in st.get("addresses", []) if a["type"] == "InternalIP"), st["address"])
+            medir("ALLOC", "asignacion", t0)
+            return f"ws://{ip}:{st['ports'][0]['port']}"
         except Exception as e:
             medir("ALLOC", "asignacion", t0, e)
             raise
